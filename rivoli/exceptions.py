@@ -1,0 +1,2 @@
+class FailedRequestingEcoCounterError(Exception):
+    pass
