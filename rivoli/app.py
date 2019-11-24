@@ -2,6 +2,7 @@ import logging
 import requests
 import traceback
 import numpy as np
+import json
 
 from datetime import datetime, timedelta
 from calendar import monthrange
@@ -9,7 +10,7 @@ from collections import Counter
 from typing import List, Tuple, Dict
 
 from rivoli.exceptions import FailedRequestingEcoCounterError
-from rivoli.config import ECO_COUNTER_URL
+from rivoli.config import ECO_COUNTER_URL, ZAPIER_WEBHOOK_URL
 from rivoli.utils import parse_mdy, dates_are_on_same_day, date_to_dmy, datetime_to_french_month
 
 
@@ -301,8 +302,26 @@ def prepare_message_for_std_out(day: datetime, count_history: CountHistory) -> s
     return '\n'.join([regular_message, relevant_facts_message])
 
 
+def prepare_tweet(day: datetime, count_history: CountHistory) -> str:
+    return prepare_message_for_std_out(day, count_history) + '\n#CompteurRivoli'
+
+
 def pad_answer(answer):
     return [['09/01/2019', '0']] + answer
+
+
+def get_tweet(event, context):
+    answer = pad_answer(fetch_data(ECO_COUNTER_URL))
+    today = datetime.now()
+    count_history = CountHistory.from_url_answer(answer)
+    yesterday = today - timedelta(days=1)
+    return {'tweet': prepare_tweet(yesterday, count_history)}
+
+
+def post_tweet(event, context):
+    payload = get_tweet(event, context)
+    print(payload)
+    requests.post(ZAPIER_WEBHOOK_URL, json.dumps(payload))
 
 
 if __name__ == '__main__':
