@@ -310,7 +310,7 @@ def pad_answer(answer):
     return [['09/01/2019', '0']] + answer
 
 
-def get_tweet(event, context):
+def get_tweet():
     answer = pad_answer(fetch_data(ECO_COUNTER_URL))
     today = datetime.now()
     count_history = CountHistory.from_url_answer(answer)
@@ -318,10 +318,18 @@ def get_tweet(event, context):
     return {'tweet': prepare_tweet(yesterday, count_history)}
 
 
-def post_tweet(event, context):
-    payload = get_tweet(event, context)
-    print(payload)
+def post_tweet():
+    payload = get_tweet()
+    logging.info(payload)
     requests.post(ZAPIER_WEBHOOK_URL, json.dumps(payload))
+
+
+def lambda_handler(event, context):
+    if event.get('test'):
+        tweet = get_tweet()
+        logging.info(tweet)
+        return tweet
+    post_tweet()
 
 
 if __name__ == '__main__':
