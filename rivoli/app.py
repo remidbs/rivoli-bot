@@ -216,19 +216,17 @@ def is_best_month_to_be(day: datetime, count_history: CountHistory) -> Tuple[boo
     month_range = monthrange(day.year, day.month)[1]
     month_advancement = day.day / month_range
     month_count_so_far = month_to_cumsum[current_month][-1]
-    other_months_advancements = []
     advancement_to_month = {}
     for other_month, cumcount in month_to_cumsum.items():
         if other_month == current_month:
             continue
         pct = np.percentile(cumcount, q=100 * month_advancement)
-        other_months_advancements.append(pct)
         advancement_to_month[pct] = other_month
-    if not other_months_advancements:
+    if not advancement_to_month:
         raise ValueError('Edge case not handled')
-    best_other_advancement = max(other_months_advancements)
+    best_other_advancement = max(advancement_to_month.keys())
     best_other_month = advancement_to_month[best_other_advancement]
-    if month_count_so_far >= max(other_months_advancements):
+    if month_count_so_far >= best_other_advancement:
         return True, month_count_so_far, best_other_month, int(best_other_advancement)
     return False, month_count_so_far, best_other_month, int(best_other_advancement)
 
@@ -312,12 +310,13 @@ if __name__ == '__main__':
     today = datetime.now()
     for i in range(len(answer)):
         count_history = CountHistory.from_url_answer(answer[: (-i or len(answer))])
+        day_of_publication = today - timedelta(days=i)
         day_to_test = today - timedelta(days=i + 1)
         try:
-            print(date_to_dmy(day_to_test))
+            print(date_to_dmy(day_of_publication))
             print(prepare_message_for_std_out(day_to_test, count_history))
         except Exception:
-            print(date_to_dmy(day_to_test))
+            print(date_to_dmy(day_of_publication))
             print(traceback.format_exc())
         print()
         print()
