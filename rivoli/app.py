@@ -1,14 +1,16 @@
 import logging
 import requests
 import traceback
+import numpy as np
 
 from datetime import datetime, timedelta
+from calendar import monthrange
 from collections import Counter
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from rivoli.exceptions import FailedRequestingEcoCounterError
 from rivoli.config import ECO_COUNTER_URL
-from rivoli.utils import parse_mdy, dates_are_on_same_day, date_to_dmy
+from rivoli.utils import parse_mdy, dates_are_on_same_day, date_to_dmy, datetime_to_french_month
 
 
 class DayCount:
@@ -100,6 +102,30 @@ class RelevantFact:
         headline = 'Record de l\'année!'
         return cls(headline=headline, details='', day=day)
 
+    @classmethod
+    def month_rank(cls, day: datetime, month_count: int, month_rank: int, month: datetime):
+        french_month = datetime_to_french_month(month)
+        french_rank = 'meilleur' if month_rank == 0 else '{}ème meilleur'.format(month_rank + 1)
+        headline = '{}: {} mois de l\'histoire avec {} passages.'.format(french_month, french_rank, month_count)
+        return cls(headline=headline, details='', day=day)
+
+    @classmethod
+    def best_month_to_be(
+        cls, day: datetime, count_so_far: int, previous_record_month: datetime, previous_record_count: int
+    ):
+        headline = (
+            'Meilleur mois à ce stade d\'avancement avec {} passages. '
+            'Précedent record: {} avec {} passages.'.format(
+                count_so_far, datetime_to_french_month(previous_record_month), previous_record_count,
+            )
+        )
+        return cls(headline=headline, details='', day=day)
+
+    @classmethod
+    def total_count(cls, day: datetime, total_count: int):
+        headline = '{} passages depuis le début.'.format(total_count)
+        return cls(headline=headline, details='', day=day)
+
 
 def fetch_data(url) -> list:
     try:
@@ -161,6 +187,70 @@ def day_is_not_first_day_of_month(day: datetime) -> bool:
     return not (day.day == 1)
 
 
+def extract_total_count(count_history: CountHistory) -> int:
+    return sum([day_count.count for day_count in count_history.daily_counts])
+
+
+def extract_month_to_cumsum(count_history: CountHistory) -> Dict[Tuple[int, int], List[int]]:
+    month_to_day_counts: Dict[Tuple[int, int], List[DayCount]] = {}
+    for day_count in count_history.daily_counts:
+        month = extract_month(day_count.date)
+        month_to_day_counts[month] = month_to_day_counts.get(month, []) + [day_count]
+    month_to_sorted_counts = {
+        month: sorted(day_counts, key=lambda day_count: day_count.date)
+        for month, day_counts in month_to_day_counts.items()
+    }
+    month_to_cumsum = {
+        month: np.cumsum([x.count for x in sorted_counts]) for month, sorted_counts in month_to_sorted_counts.items()
+    }
+    return month_to_cumsum
+
+
+def extract_month(day: datetime) -> Tuple[int, int]:
+    return (day.year, day.month)
+
+
+def is_best_month_to_be(day: datetime, count_history: CountHistory) -> Tuple[bool, int, Tuple[int, int], int]:
+    month_to_cumsum = extract_month_to_cumsum(count_history)
+    current_month = extract_month(day)
+    month_range = monthrange(day.year, day.month)[1]
+    month_advancement = day.day / month_range
+    month_count_so_far = month_to_cumsum[current_month][-1]
+    other_months_advancements = []
+    advancement_to_month = {}
+    for other_month, cumcount in month_to_cumsum.items():
+        if other_month == current_month:
+            continue
+        pct = np.percentile(cumcount, q=100 * month_advancement)
+        other_months_advancements.append(pct)
+        advancement_to_month[pct] = other_month
+    if not other_months_advancements:
+        raise ValueError('Edge case not handled')
+    best_other_advancement = max(other_months_advancements)
+    best_other_month = advancement_to_month[best_other_advancement]
+    if month_count_so_far >= max(other_months_advancements):
+        return True, month_count_so_far, best_other_month, int(best_other_advancement)
+    return False, month_count_so_far, best_other_month, int(best_other_advancement)
+
+
+def extract_rank_in_decreasing_list(value, sequence: list) -> int:
+    if value not in sequence:
+        raise ValueError('Value {} not in given sequence {}'.format(value, sequence))
+    return np.where(np.sort(sequence)[::-1] == value)[0][0]
+
+
+def extract_previous_month_stats(day: datetime, count_history: CountHistory) -> Tuple[int, int, datetime]:
+    previous_month_datetime = day - timedelta(days=day.day)
+    previous_month = extract_month(previous_month_datetime)
+    month_to_cumsum = extract_month_to_cumsum(count_history)
+    month_to_total = {month: cumcount[-1] for month, cumcount in month_to_cumsum.items()}
+    if previous_month not in month_to_total:
+        raise ValueError('Previous month not in history.')
+    previous_month_total = month_to_total[previous_month]
+    previous_month_rank = extract_rank_in_decreasing_list(previous_month_total, list(month_to_total.values()))
+    return previous_month_total, previous_month_rank, previous_month_datetime
+
+
 def extract_relevant_facts(day: datetime, count_history: CountHistory) -> list:
     if not day_in_history(day, count_history):
         raise ValueError('Day {} is not in count history'.format(date_to_dmy(day)))
@@ -171,10 +261,25 @@ def extract_relevant_facts(day: datetime, count_history: CountHistory) -> list:
         relevant_facts.append(RelevantFact.new_yearly_record(day))
     elif day_is_not_first_day_of_month(day) and day_is_monthly_record(day, count_history):
         relevant_facts.append(RelevantFact.new_monthly_record(day))
+    elif not day_is_not_first_day_of_month(day):
+        month_count, month_rank, previous_month_datetime = extract_previous_month_stats(day, count_history)
+        relevant_facts.append(RelevantFact.month_rank(day, month_count, month_rank, previous_month_datetime))
     else:
         it_is, rank = day_is_absolute_top_k(day, count_history, k=10)
         if it_is:
             relevant_facts.append(RelevantFact.top_k(day, rank))
+        else:
+            it_is, count_so_far, (other_month_year, other_month_month), other_count = is_best_month_to_be(
+                day, count_history
+            )
+            if it_is:
+                previous_record_month = datetime(year=other_month_year, month=other_month_month, day=1)
+                relevant_facts.append(
+                    RelevantFact.best_month_to_be(day, count_so_far, previous_record_month, other_count)
+                )
+            else:
+                total_count = extract_total_count(count_history)
+                relevant_facts.append(RelevantFact.total_count(day, total_count))
     return relevant_facts
 
 
@@ -198,12 +303,21 @@ def prepare_message_for_std_out(day: datetime, count_history: CountHistory) -> s
     return '\n'.join([regular_message, relevant_facts_message])
 
 
+def pad_answer(answer):
+    return [['09/01/2019', '0']] + answer
+
+
 if __name__ == '__main__':
-    count_history = CountHistory.from_url_answer(fetch_data(ECO_COUNTER_URL))
+    answer = pad_answer(fetch_data(ECO_COUNTER_URL))
     today = datetime.now()
-    days_to_test = [today - timedelta(days=k) for k in range(100)]
-    for day_to_test in days_to_test:
+    for i in range(len(answer)):
+        count_history = CountHistory.from_url_answer(answer[: (-i or len(answer))])
+        day_to_test = today - timedelta(days=i + 1)
         try:
-            print(date_to_dmy(day_to_test), prepare_message_for_std_out(day_to_test, count_history))
-        except Exception as e:
-            print(e)
+            print(date_to_dmy(day_to_test))
+            print(prepare_message_for_std_out(day_to_test, count_history))
+        except Exception:
+            print(date_to_dmy(day_to_test))
+            print(traceback.format_exc())
+        print()
+        print()
