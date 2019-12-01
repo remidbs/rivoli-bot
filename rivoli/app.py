@@ -180,12 +180,17 @@ def day_is_absolute_top_k(day: datetime, count_history: CountHistory, k: int) ->
     return False, -1
 
 
-def day_is_not_first_day_of_year(day: datetime) -> bool:
-    return not (day.month == 1 and day.day == 1)
+def day_is_last_day_of_month(day: datetime) -> bool:
+    day_after = day + timedelta(days=1)
+    return day_after.day == 1
 
 
-def day_is_not_first_day_of_month(day: datetime) -> bool:
-    return not (day.day == 1)
+def day_is_first_day_of_year(day: datetime) -> bool:
+    return day.month == 1 and day.day == 1
+
+
+def day_is_first_day_of_month(day: datetime) -> bool:
+    return day.day == 1
 
 
 def extract_total_count(count_history: CountHistory) -> int:
@@ -238,16 +243,15 @@ def extract_rank_in_decreasing_list(value, sequence: list) -> int:
     return np.where(np.sort(sequence)[::-1] == value)[0][0]
 
 
-def extract_previous_month_stats(day: datetime, count_history: CountHistory) -> Tuple[int, int, datetime]:
-    previous_month_datetime = day - timedelta(days=day.day)
-    previous_month = extract_month(previous_month_datetime)
+def extract_month_stats(day: datetime, count_history: CountHistory) -> Tuple[int, int, datetime]:
+    month = extract_month(day)
     month_to_cumsum = extract_month_to_cumsum(count_history)
-    month_to_total = {month: cumcount[-1] for month, cumcount in month_to_cumsum.items()}
-    if previous_month not in month_to_total:
+    month_to_total = {mnth: cumcount[-1] for mnth, cumcount in month_to_cumsum.items()}
+    if month not in month_to_total:
         raise ValueError('Previous month not in history.')
-    previous_month_total = month_to_total[previous_month]
-    previous_month_rank = extract_rank_in_decreasing_list(previous_month_total, list(month_to_total.values()))
-    return previous_month_total, previous_month_rank, previous_month_datetime
+    month_total = month_to_total[month]
+    month_rank = extract_rank_in_decreasing_list(month_total, list(month_to_total.values()))
+    return month_total, month_rank, day
 
 
 def extract_relevant_facts(day: datetime, count_history: CountHistory) -> list:
@@ -256,13 +260,13 @@ def extract_relevant_facts(day: datetime, count_history: CountHistory) -> list:
     relevant_facts: List[RelevantFact] = []
     if day_is_absolute_maximum(day, count_history):
         relevant_facts.append(RelevantFact.new_record(day))
-    elif day_is_not_first_day_of_year(day) and day_is_yearly_maximum(day, count_history):
-        relevant_facts.append(RelevantFact.new_yearly_record(day))
-    elif day_is_not_first_day_of_month(day) and day_is_monthly_record(day, count_history):
-        relevant_facts.append(RelevantFact.new_monthly_record(day))
-    elif not day_is_not_first_day_of_month(day):
-        month_count, month_rank, previous_month_datetime = extract_previous_month_stats(day, count_history)
+    elif day_is_last_day_of_month(day):
+        month_count, month_rank, previous_month_datetime = extract_month_stats(day, count_history)
         relevant_facts.append(RelevantFact.month_rank(day, month_count, month_rank, previous_month_datetime))
+    elif not day_is_first_day_of_year(day) and day_is_yearly_maximum(day, count_history):
+        relevant_facts.append(RelevantFact.new_yearly_record(day))
+    elif not day_is_first_day_of_month(day) and day_is_monthly_record(day, count_history):
+        relevant_facts.append(RelevantFact.new_monthly_record(day))
     else:
         it_is, rank = day_is_absolute_top_k(day, count_history, k=10)
         if it_is:
