@@ -260,29 +260,30 @@ def extract_relevant_facts(day: datetime, count_history: CountHistory) -> list:
     relevant_facts: List[RelevantFact] = []
     if day_is_absolute_maximum(day, count_history):
         relevant_facts.append(RelevantFact.new_record(day))
-    elif day_is_last_day_of_month(day):
-        month_count, month_rank, previous_month_datetime = extract_month_stats(day, count_history)
-        relevant_facts.append(RelevantFact.month_rank(day, month_count, month_rank, previous_month_datetime))
-    elif not day_is_first_day_of_year(day) and day_is_yearly_maximum(day, count_history):
-        relevant_facts.append(RelevantFact.new_yearly_record(day))
-    elif not day_is_first_day_of_month(day) and day_is_monthly_record(day, count_history):
-        relevant_facts.append(RelevantFact.new_monthly_record(day))
     else:
         it_is, rank = day_is_absolute_top_k(day, count_history, k=10)
         if it_is:
             relevant_facts.append(RelevantFact.top_k(day, rank))
         else:
-            it_is, count_so_far, (other_month_year, other_month_month), other_count = is_best_month_to_be(
-                day, count_history
-            )
-            if it_is:
-                previous_record_month = datetime(year=other_month_year, month=other_month_month, day=1)
-                relevant_facts.append(
-                    RelevantFact.best_month_to_be(day, count_so_far, previous_record_month, other_count)
-                )
+            if day_is_last_day_of_month(day):
+                month_count, month_rank, previous_month_datetime = extract_month_stats(day, count_history)
+                relevant_facts.append(RelevantFact.month_rank(day, month_count, month_rank, previous_month_datetime))
+            elif not day_is_first_day_of_year(day) and day_is_yearly_maximum(day, count_history):
+                relevant_facts.append(RelevantFact.new_yearly_record(day))
+            elif not day_is_first_day_of_month(day) and day_is_monthly_record(day, count_history):
+                relevant_facts.append(RelevantFact.new_monthly_record(day))
             else:
-                total_count = extract_total_count(count_history)
-                relevant_facts.append(RelevantFact.total_count(day, total_count))
+                it_is, count_so_far, (other_month_year, other_month_month), other_count = is_best_month_to_be(
+                    day, count_history
+                )
+                if it_is:
+                    previous_record_month = datetime(year=other_month_year, month=other_month_month, day=1)
+                    relevant_facts.append(
+                        RelevantFact.best_month_to_be(day, count_so_far, previous_record_month, other_count)
+                    )
+                else:
+                    total_count = extract_total_count(count_history)
+                    relevant_facts.append(RelevantFact.total_count(day, total_count))
     return relevant_facts
 
 
