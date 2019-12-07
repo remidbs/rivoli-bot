@@ -10,7 +10,7 @@ from collections import Counter
 from typing import List, Tuple, Dict
 
 from rivoli.exceptions import FailedRequestingEcoCounterError
-from rivoli.config import ECO_COUNTER_URL, ZAPIER_WEBHOOK_URL
+from rivoli.config import ECO_COUNTER_URL, ZAPIER_WEBHOOK_URL, SLACK_TEST_URL
 from rivoli.utils import parse_mdy, dates_are_on_same_day, date_to_dmy, datetime_to_french_month
 
 
@@ -329,10 +329,15 @@ def post_tweet():
     requests.post(ZAPIER_WEBHOOK_URL, json.dumps(payload))
 
 
+def post_text_to_slack(text: str) -> None:
+    requests.post(url=SLACK_TEST_URL, data=json.dumps({'text': text}))
+
+
 def lambda_handler(event, context):
     if event.get('test'):
         tweet = get_tweet()
         logging.info(tweet)
+        post_text_to_slack(tweet['tweet'])
         return tweet
     post_tweet()
 
