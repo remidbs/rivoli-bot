@@ -339,7 +339,8 @@ def lambda_handler(event, context):
         logging.info(tweet)
         post_text_to_slack(tweet['tweet'])
         return tweet
-    post_tweet()
+    logging.info('Posting tweet')
+    # post_tweet()
 
 
 if __name__ == '__main__':
