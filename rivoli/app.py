@@ -10,8 +10,10 @@ from collections import Counter
 from typing import List, Tuple, Dict
 
 from rivoli.exceptions import FailedRequestingEcoCounterError
-from rivoli.config import ECO_COUNTER_URL, ZAPIER_WEBHOOK_URL, SLACK_TEST_URL
+from rivoli.config import ECO_COUNTER_URL, SLACK_TEST_URL, get_twitter
 from rivoli.utils import parse_mdy, dates_are_on_same_day, date_to_dmy, datetime_to_french_month
+
+logging.getLogger().setLevel(logging.INFO)
 
 
 class DayCount:
@@ -21,11 +23,11 @@ class DayCount:
 
     @classmethod
     def from_json(cls, dict_):
-        return cls(date=dict_['date'].timestamp(), count=dict_['count'])
+        return cls(date=datetime.fromtimestamp(dict_['date']), count=dict_['count'])
 
     def to_json(self):
         return {
-            'date': datetime.fromtimestamp(self.date),
+            'date': self.date.timestamp(),
             'count': self.count,
         }
 
@@ -315,18 +317,19 @@ def pad_answer(answer):
     return [['09/01/2019', '0']] + answer
 
 
-def get_tweet():
+def get_tweet() -> str:
     answer = pad_answer(fetch_data(ECO_COUNTER_URL))
     today = datetime.now()
     count_history = CountHistory.from_url_answer(answer)
     yesterday = today - timedelta(days=1)
-    return {'tweet': prepare_tweet(yesterday, count_history)}
+    return prepare_tweet(yesterday, count_history)
 
 
-def post_tweet():
-    payload = get_tweet()
-    logging.info(payload)
-    requests.post(ZAPIER_WEBHOOK_URL, json.dumps(payload))
+def post_tweet(tweet: str) -> None:
+    tweet = get_tweet()
+    logging.info(tweet)
+    twitter_api = get_twitter()
+    twitter_api.update_status(tweet)
 
 
 def post_text_to_slack(text: str) -> None:
@@ -334,13 +337,14 @@ def post_text_to_slack(text: str) -> None:
 
 
 def lambda_handler(event, context):
+    tweet = get_tweet()
+    logging.info(tweet)
     if event.get('test'):
-        tweet = get_tweet()
-        logging.info(tweet)
-        post_text_to_slack(tweet['tweet'])
+        logging.info('Posting to slack')
+        post_text_to_slack(tweet)
         return tweet
     logging.info('Posting tweet')
-    post_tweet()
+    post_tweet(tweet)
 
 
 if __name__ == '__main__':
