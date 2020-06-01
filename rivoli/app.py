@@ -118,7 +118,7 @@ class RelevantFact:
     ):
         headline = (
             'Meilleur mois à ce stade d\'avancement avec {} passages. '
-            'Précedent record: {} avec {} passages.'.format(
+            'Précédent record: {} avec {} passages.'.format(
                 count_so_far, datetime_to_french_month(previous_record_month), previous_record_count,
             )
         )
