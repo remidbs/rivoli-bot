@@ -1,7 +1,9 @@
+from typing import Optional
+
+
 import tweepy
 
 from rivoli.secrets import secrets
-from typing import Optional
 
 ECO_COUNTER_URL = secrets['ecoCounterUrl']
 ZAPIER_WEBHOOK_URL = secrets['zapierWebhookUrl']
