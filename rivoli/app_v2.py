@@ -8,7 +8,7 @@ from typing import Callable, Dict, List, Set, Tuple, TypeVar, Union
 
 import requests
 
-from rivoli.config import ECO_COUNTER_URL, get_twitter
+from rivoli.config import ECO_COUNTER_URL, SLACK_TEST_URL, get_twitter
 from rivoli.exceptions import FailedRequestingEcoCounterError, PublishError
 from rivoli.utils import parse_mdy
 
@@ -43,6 +43,7 @@ class DictionaryKey(Enum):
     YEAR_OF_HISTORY = 'YEAR_OF_HISTORY'
     YESTERDAY = 'YESTERDAY'
     TODAY = 'TODAY'
+    ON_DAY = 'ON_DAY'
 
 
 class DayOfWeek(Enum):
@@ -59,8 +60,8 @@ class DayOfWeek(Enum):
 
 
 class Language(Enum):
-    FR = 'fr'
-    EN = 'en'
+    FR = 'FR'
+    EN = 'EN'
 
     @staticmethod
     def values() -> Set:
@@ -92,7 +93,7 @@ class Dictionary:
 
     @staticmethod
     def check_json(json_dictionary: Dict[str, Dict[str, str]]) -> Tuple[bool, str]:
-        if isinstance(json_dictionary, dict):
+        if not isinstance(json_dictionary, dict):
             return False, 'json_dictionary must be of type dict'
         return True, ''
 
@@ -203,8 +204,8 @@ class HistoricalTimeRange(CustomTimeRange):
 class DayTimeRange(TimeRange):
     def __init__(self, start_date: datetime) -> None:
         self.check(start_date)
-        self.start_date = start_date
-        self.end_date = start_date + timedelta(days=1)
+        self.start_date: datetime = start_date
+        self.end_date: datetime = start_date + timedelta(days=1)
 
     def contains(self, date: datetime) -> bool:
         return self.start_date <= date < self.end_date
@@ -226,6 +227,9 @@ class DayTimeRange(TimeRange):
     def month(self) -> int:
         return self.start_date.month
 
+    def __hash__(self):
+        return hash(self.start_date.date())
+
     @staticmethod
     def check(date: datetime) -> None:
         if date.hour != 0 or date.minute != 0 or date.second != 0:
@@ -236,7 +240,7 @@ class DayTimeRange(TimeRange):
             return dictionary[DictionaryKey.TODAY][language]
         if (day_of_publication - timedelta(days=1)).date() == self.start_date.date():
             return dictionary[DictionaryKey.YESTERDAY][language]
-        raise NotImplementedError()
+        return f'{dictionary[DictionaryKey.ON_DAY][language]} {self.start_date.strftime("%Y-%m-%d")}'
 
 
 class HourTimeRange(TimeRange):
@@ -351,61 +355,59 @@ class HourlyCountHistory(DailyCountHistory):
         return {day: sum(counts) for day, counts in day_to_hour_counts.items()}
 
 
-class CountHistoryDownloader:
-    def download_count_history(self) -> DailyCountHistory:
-        raise NotImplementedError()
+def download_rivoli_count_history() -> DailyCountHistory:
+    answer = requests.post(ECO_COUNTER_URL)
+    if answer.status_code == 200:
+        json_answer = answer.json()
+    else:
+        raise FailedRequestingEcoCounterError(answer.content.decode())
+    return _format_answer(json_answer)
 
 
-class EcoCounterDownloader(CountHistoryDownloader):
-    def download_count_history(self) -> DailyCountHistory:
-        answer = requests.post(ECO_COUNTER_URL)
-        if answer.status_code != 200:
-            json_answer = answer.json()
-        else:
-            raise FailedRequestingEcoCounterError(answer.content.decode())
-        return self._format_answer(json_answer)
+def _check_answer(answer: List) -> Tuple[bool, str]:
+    if not isinstance(answer, list):
+        return False, f'Expected API answer type is list, received {type(answer)}'
+    if answer[0][0] != '09/02/2019':
+        return False, f'Expected first day of data: 09/02/2019. Received {answer[0][0]}'
+    pairs = answer[:-1]
+    if {len(pair) for pair in pairs} != {2}:
+        return (
+            False,
+            'Expecting a list of pairs, lengths received: {}'.format(
+                Counter([len(pair) for pair in pairs]).most_common()
+            ),
+        )
+    return True, ''
 
-    @classmethod
-    def _check_answer(cls, answer: List) -> Tuple[bool, str]:
-        if not isinstance(answer, list):
-            return False, f'Expected API answer type is list, received {type(answer)}'
-        if not answer[0][0] != '09/02/2019':
-            return False, f'Expected first day of data: 09/02/2019. Received {answer[0][0]}'
-        pairs = answer[:-1]
-        if {len(pair) for pair in pairs} != {2}:
-            return (
-                False,
-                'Expecting a list of pairs, lengths received: {}'.format(
-                    Counter([len(pair) for pair in pairs]).most_common()
-                ),
-            )
-        return True, ''
 
-    @classmethod
-    def _format_pair(cls, pair: Tuple[str, str]) -> Tuple[DayTimeRange, int]:
-        if len(pair) != 2:
-            raise ValueError('Need a pair as argument, received {}'.format(pair))
-        date = parse_mdy(pair[0])
-        time_range = DayTimeRange(start_date=date)
-        count = int(float(pair[1]))
-        return time_range, count
+def _format_pair(pair: Tuple[str, str]) -> Tuple[DayTimeRange, int]:
+    if len(pair) != 2:
+        raise ValueError('Need a pair as argument, received {}'.format(pair))
+    date = parse_mdy(pair[0])
+    time_range = DayTimeRange(start_date=date)
+    count = int(float(pair[1]))
+    return time_range, count
 
-    @staticmethod
-    def _pad_answer(answer):
-        return [['09/01/2019', '0']] + answer
 
-    @classmethod
-    def _format_answer(cls, answer: List[Tuple[str, str]]) -> DailyCountHistory:
-        is_ok, message = cls._check_answer(answer)
-        if not is_ok:
-            raise ValueError(f'Cannot build count history from url answer, reason: {message}')
-        padded_answer = cls._pad_answer(answer)
-        day_to_count = dict([cls._format_pair(pair) for pair in padded_answer[:-1]])
-        return DailyCountHistory(day_to_count=day_to_count)
+def _pad_answer(answer):
+    return [['09/01/2019', '0']] + answer
+
+
+def _format_answer(answer: List[Tuple[str, str]]) -> DailyCountHistory:
+    is_ok, message = _check_answer(answer)
+    if not is_ok:
+        raise ValueError(f'Cannot build count history from url answer, reason: {message}')
+    padded_answer = _pad_answer(answer)
+    day_to_count = dict([_format_pair(pair) for pair in padded_answer[:-1]])
+    return DailyCountHistory(day_to_count=day_to_count)
+
+
+def truncate(date: datetime) -> datetime:
+    return datetime(date.year, date.month, date.day)
 
 
 def generate_mock_count_history(nb_days: int) -> DailyCountHistory:
-    now = datetime.now()
+    now = truncate(datetime.now())
     start_date = now - timedelta(days=nb_days)
     day_to_count = {DayTimeRange(start_date + timedelta(days=i)): random.randint(0, 100) for i in range(nb_days)}
     return DailyCountHistory(day_to_count)
@@ -471,6 +473,10 @@ def rank_to_ordinal(rank: int, language: Language, dictionary: Dictionary) -> st
     return f'{rank}{dictionary[DictionaryKey.ITH][language]}'
 
 
+def capitalize_first_letter(str_: str) -> str:
+    return (str_[0].upper() + str_[1:]) if str else ''
+
+
 class TotalRelevantFact(RelevantFact):
     def __init__(self, target_range: TimeRange, priority: int, total: int) -> None:
         super().__init__(target_range, priority)
@@ -481,7 +487,7 @@ class TotalRelevantFact(RelevantFact):
         raise NotImplementedError()
 
     def to_string(self, language: Language, day_of_publication: datetime, dictionary: Dictionary) -> str:
-        return f'{self.total} {self.end_of_sentence( language, dictionary)}.'
+        return capitalize_first_letter(f'{self.total} {self.end_of_sentence( language, dictionary)}.')
 
 
 class HistoricalTotalRelevantFact(TotalRelevantFact):
@@ -521,7 +527,7 @@ class RankOfTotalRelevantFact(RelevantFact):
         best = self._get_best(self.rank, language, dictionary)
         end_of_sentence = self._get_rank_end_of_sentence(self.target_range, language, dictionary)
         string_time_range = self.target_range.to_string(language, day_of_publication, dictionary)
-        return f'{string_time_range}: {best} {end_of_sentence}'
+        return capitalize_first_letter(f'{string_time_range}, {best} {end_of_sentence}')
 
 
 class DayOfMonthRankOfTotalRelevantFact(RankOfTotalRelevantFact):
@@ -646,7 +652,7 @@ def extract_total_hourly(count_history: HourlyCountHistory, target_range: HourTi
 
 
 def extract_total(count_history: DailyCountHistory, target_range: DayTimeRange) -> int:
-    return count_history.day_to_count[target_range]
+    return sum(count_history.day_to_count.values())
 
 
 def human_rank_in_list(quantity: Union[float, int], list_: Union[List[float], List[int]]) -> Tuple[int, int]:
@@ -694,7 +700,7 @@ def share_year(range_1: DayTimeRange, range_2: DayTimeRange) -> bool:
 
 
 def share_month(range_1: DayTimeRange, range_2: DayTimeRange) -> bool:
-    return range_1.month() == range_2.month()
+    return range_1.year() == range_2.year() and range_1.month() == range_2.month()
 
 
 def get_rank_of_day_in_year(count_history: DailyCountHistory, target_range: DayTimeRange) -> Tuple[int, int]:
@@ -709,14 +715,19 @@ def extract_month_total(count_history: DailyCountHistory, target_range: DayTimeR
     return sum([count for day, count in count_history.day_to_count.items() if day.month() == target_range.month()])
 
 
-def extract_relevant_facts(
-    count_history: DailyCountHistory, among_range: TimeRange, target_range: DayTimeRange
-) -> List[RelevantFact]:
-    if not among_range.contains(target_range.start_date) or not among_range.contains(target_range.end_date):
-        raise ValueError('Arg among_range must contain arg target_range')
+def extract_year_total(count_history: DailyCountHistory, target_range: DayTimeRange) -> int:
+    return sum([count for day, count in count_history.day_to_count.items() if day.year() == target_range.year()])
+
+
+def extract_relevant_facts(count_history: DailyCountHistory, target_range: DayTimeRange) -> List[RelevantFact]:
+    if target_range not in count_history.day_to_count:
+        raise ValueError('Cannot query a day that is not in history.')
 
     facts: List[RelevantFact] = []
     facts.append(HistoricalTotalRelevantFact(target_range, 0, extract_total(count_history, target_range)))
+    facts.append(YearTotalRelevantFact(target_range, 0, extract_year_total(count_history, target_range)))
+    facts.append(MonthTotalRelevantFact(target_range, 0, extract_month_total(count_history, target_range)))
+
     facts.append(
         YearDayOfWeekRankRelevantFact(
             target_range,
@@ -749,7 +760,6 @@ def extract_relevant_facts(
             *get_rank_of_day_in_month(count_history, target_range),
         )
     )
-    facts.append(MonthTotalRelevantFact(target_range, 0, extract_month_total(count_history, target_range)))
     if isinstance(count_history, HourlyCountHistory):
         pass  # TODO
     return facts
@@ -767,3 +777,33 @@ def relevant_facts_to_string(
         raise ValueError('Need at least one relevant fact')
     top_relevant_facts = extract_highest_priority_relevant_facts(relevant_facts)
     return random.choice(top_relevant_facts).to_string(language, time_of_publication, dictionary)
+
+
+def test():
+    count_history = generate_mock_count_history(400)
+    target_day = list(count_history.day_to_count.keys())[-1]
+    facts = extract_relevant_facts(count_history, target_day)
+    dictionary = Dictionary.from_json(json.load(open('/'.join(__file__.split('/')[:-1] + ['dictionary.json']))))
+    for fact in facts:
+        print(fact.to_string(Language.FR, datetime.now(), dictionary))
+
+
+def post_text_to_slack(text: str) -> None:
+    requests.post(url=SLACK_TEST_URL, data=json.dumps({'text': text}))
+
+
+def post_all_rivoli_facts():
+    dictionary = Dictionary.from_json(json.load(open('/'.join(__file__.split('/')[:-1] + ['dictionary.json']))))
+    count_history = download_rivoli_count_history()
+    target_day = list(count_history.day_to_count.keys())[-1]
+    facts = extract_relevant_facts(count_history, target_day)
+    message = '\n'.join([fact.to_string(Language.FR, datetime.now(), dictionary) for fact in facts])
+    post_text_to_slack(message)
+
+
+def lambda_handler(event, context):
+    post_all_rivoli_facts()
+
+
+if __name__ == '__main__':
+    post_all_rivoli_facts()
