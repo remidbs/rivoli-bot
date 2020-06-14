@@ -110,5 +110,33 @@
     "ON_DAY": {
         "FR": "le",
         "EN": "on"
+    },
+    "RANK_AMONG_ECO_COUNTERS": {
+        "FR": "compteur (parmi les 200+ compteurs d'@ecocounter)",
+        "EN": "counter (among the 200+ counters managed by @ecocounter)"
+    },
+    "BEST_COUNTER": {
+        "FR": "record mondial parmi les compteurs d'@ecocounter",
+        "EN": "global record among @ecocounter counters"
+    },
+    "BEST_NEIGHBOR_COUNTER": {
+        "FR": "record mondial parmi les compteurs d'@ecocounter pour le voisin {}",
+        "EN": "global record among @ecocounter counters for {} neighbor"
+    },
+    "SEBASTOPOL": {
+        "FR": "de Sébastopol",
+        "EN": "Sébastopol street"
+    },
+    "RIVOLI": {
+        "FR": "de Rivoli",
+        "EN": "Rivoli street"
+    },
+    "COURS_LA_REINE": {
+        "FR": "de Cours La Reine",
+        "EN": "Cours la Reine"
+    },
+    "AUSTERLITZ": {
+        "FR": "d'Austerlitz",
+        "EN": "Austerlitz"
     }
 }

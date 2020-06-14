@@ -4,11 +4,11 @@ import random
 from collections import Counter
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable, Dict, List, Set, Tuple, TypeVar, Union
+from typing import Callable, Dict, Iterable, List, NamedTuple, Set, Tuple, TypeVar, Union
 
 import requests
 
-from rivoli.config import ECO_COUNTER_URL, SLACK_TEST_URL, get_twitter
+from rivoli.config import ECO_COUNTER_URL, ECO_COUNTER_GLOBAL_URL, SLACK_TEST_URL, get_twitter
 from rivoli.exceptions import FailedRequestingEcoCounterError, PublishError
 from rivoli.utils import parse_mdy
 
@@ -44,6 +44,13 @@ class DictionaryKey(Enum):
     YESTERDAY = 'YESTERDAY'
     TODAY = 'TODAY'
     ON_DAY = 'ON_DAY'
+    RANK_AMONG_ECO_COUNTERS = 'RANK_AMONG_ECO_COUNTERS'
+    BEST_COUNTER = 'BEST_COUNTER'
+    BEST_NEIGHBOR_COUNTER = 'BEST_NEIGHBOR_COUNTER'
+    SEBASTOPOL = 'SEBASTOPOL'
+    COURS_LA_REINE = 'COURS_LA_REINE'
+    AUSTERLITZ = 'AUSTERLITZ'
+    RIVOLI = 'RIVOLI'
 
 
 class DayOfWeek(Enum):
@@ -96,6 +103,20 @@ class Dictionary:
         if not isinstance(json_dictionary, dict):
             return False, 'json_dictionary must be of type dict'
         return True, ''
+
+
+class ParisianCountersRanks(NamedTuple):
+    rivoli: int
+    sebastopol: int
+    austerlitz: int
+    cours_la_reine: int
+
+
+class EcoCounterId(Enum):
+    RIVOLI = '100154889'
+    SEBASTOPOL = '100158705'
+    AUSTERLITZ = '100158703'
+    COURS_LA_REINE = '100158704'
 
 
 class Publisher:
@@ -364,6 +385,49 @@ def download_rivoli_count_history() -> DailyCountHistory:
     return _format_answer(json_answer)
 
 
+class EcoCount:
+    def __init__(self, counter_id: str, name: str, count: int) -> None:
+        self.counter_id: str = counter_id
+        self.name: str = name
+        self.count: int = count
+
+    @classmethod
+    def from_json(cls, dict_):
+        return cls(counter_id=dict_['idPdc'], name=dict_['nom'], count=int(dict_['total']))
+
+
+class GlobalEcoData:
+    def __init__(self, counts: List[EcoCount]):
+        self.counts: List[EcoCount] = counts
+
+    @classmethod
+    def from_json(cls, dict_):
+        return cls(counts=[EcoCount.from_json(count) for count in dict_])
+
+
+def extract_json(response: requests.Response) -> Dict:
+    if response.status_code != 200:
+        raise ValueError(response.content.decode() if isinstance(response.content, bytes) else response.content)
+    return response.json()
+
+
+def stringify(number: int, nb_digits: int = 2) -> str:
+    number_str = str(number)
+    return '0' * (nb_digits - len(number_str)) + number_str
+
+
+def download_global_data(target_date: datetime) -> GlobalEcoData:
+    answer = requests.post(
+        ECO_COUNTER_GLOBAL_URL.format(
+            target_day=stringify(target_date.day),
+            target_month=stringify(target_date.month),
+            target_year=target_date.year,
+        )
+    )
+    dict_ = extract_json(answer)
+    return GlobalEcoData.from_json(dict_)
+
+
 def _check_answer(answer: List) -> Tuple[bool, str]:
     if not isinstance(answer, list):
         return False, f'Expected API answer type is list, received {type(answer)}'
@@ -474,7 +538,7 @@ def rank_to_ordinal(rank: int, language: Language, dictionary: Dictionary) -> st
 
 
 def capitalize_first_letter(str_: str) -> str:
-    return (str_[0].upper() + str_[1:]) if str else ''
+    return (str_[0].upper() + str_[1:]) if str_ else ''
 
 
 class TotalRelevantFact(RelevantFact):
@@ -604,9 +668,7 @@ def get_female_best(rank: int, language: Language, dictionary: Dictionary) -> st
     return ordinal_best
 
 
-def get_male_best_day_of_week_sentence(
-    rank: int, day_of_week: DayOfWeek, language: Language, dictionary: Dictionary
-) -> str:
+def get_best_day_of_week_sentence(rank: int, day_of_week: DayOfWeek, language: Language, dictionary: Dictionary) -> str:
     day_of_week_name = day_of_week_to_name(day_of_week, language, dictionary)
     return f'{get_male_best(rank, language, dictionary)} {day_of_week_name}'
 
@@ -623,9 +685,7 @@ class DayOfWeekRankRelevantFact(RelevantFact):
         raise NotImplementedError()
 
     def to_string(self, language: Language, day_of_publication: datetime, dictionary: Dictionary) -> str:
-        best_day_of_week_sentence = get_male_best_day_of_week_sentence(
-            self.rank, self.day_of_week, language, dictionary
-        )
+        best_day_of_week_sentence = get_best_day_of_week_sentence(self.rank, self.day_of_week, language, dictionary)
         return f'{best_day_of_week_sentence} {self.get_end_of_sentence(language, dictionary)}.'
 
 
@@ -647,11 +707,57 @@ class MonthDayOfWeekRankRelevantFact(DayOfWeekRankRelevantFact):
         return dictionary[DictionaryKey.SINCE_BEGINING_OF_MONTH][language]
 
 
+class GlobalEcoRankRelevantFact(RelevantFact):
+    def __init__(self, target_range: TimeRange, priority: int, parisian_ranks: ParisianCountersRanks):
+        super().__init__(target_range, priority)
+        self.parisian_ranks: ParisianCountersRanks = parisian_ranks
+
+    def to_string(self, language: Language, day_of_publication: datetime, dictionary: Dictionary) -> str:
+        sentence_begin = get_male_best(self.parisian_ranks.rivoli, language, dictionary)
+        sentence_end = dictionary[DictionaryKey.RANK_AMONG_ECO_COUNTERS][language]
+        return f'{sentence_begin} {sentence_end}'
+
+
+def extract_parisian_winner(parisian_ranks: ParisianCountersRanks) -> EcoCounterId:
+    if parisian_ranks.austerlitz == 1:
+        return EcoCounterId.AUSTERLITZ
+    if parisian_ranks.cours_la_reine == 1:
+        return EcoCounterId.COURS_LA_REINE
+    if parisian_ranks.rivoli == 1:
+        return EcoCounterId.RIVOLI
+    if parisian_ranks.sebastopol == 1:
+        return EcoCounterId.SEBASTOPOL
+    raise ValueError('No parisian counter has rank 1')
+
+
+def extract_counter_name(id_: EcoCounterId, language: Language, dictionary: Dictionary) -> str:
+    if id_ == EcoCounterId.AUSTERLITZ:
+        return dictionary[DictionaryKey.AUSTERLITZ][language]
+    if id_ == EcoCounterId.COURS_LA_REINE:
+        return dictionary[DictionaryKey.COURS_LA_REINE][language]
+    if id_ == EcoCounterId.SEBASTOPOL:
+        return dictionary[DictionaryKey.SEBASTOPOL][language]
+    return dictionary[DictionaryKey.RIVOLI][language]
+
+
+class ParisianGlobalEcoRanksRelevantFact(RelevantFact):
+    def __init__(self, target_range: TimeRange, priority: int, parisian_ranks: ParisianCountersRanks):
+        super().__init__(target_range, priority)
+        self.parisian_winner = extract_parisian_winner(parisian_ranks)
+
+    def to_string(self, language: Language, day_of_publication: datetime, dictionary: Dictionary) -> str:
+        if self.parisian_winner == EcoCounterId.RIVOLI:
+            return dictionary[DictionaryKey.BEST_COUNTER][language]
+        return dictionary[DictionaryKey.BEST_NEIGHBOR_COUNTER][language].format(
+            extract_counter_name(self.parisian_winner, language, dictionary)
+        )
+
+
 def extract_total_hourly(count_history: HourlyCountHistory, target_range: HourTimeRange) -> int:
     return count_history.hour_to_count[target_range]
 
 
-def extract_total(count_history: DailyCountHistory, target_range: DayTimeRange) -> int:
+def extract_total(count_history: DailyCountHistory) -> int:
     return sum(count_history.day_to_count.values())
 
 
@@ -719,14 +825,36 @@ def extract_year_total(count_history: DailyCountHistory, target_range: DayTimeRa
     return sum([count for day, count in count_history.day_to_count.items() if day.year() == target_range.year()])
 
 
-def extract_relevant_facts(count_history: DailyCountHistory, target_range: DayTimeRange) -> List[RelevantFact]:
+def extract_counter_rank(sorted_counts: Iterable[EcoCount], counter_id: str) -> int:
+    for i, count in enumerate(sorted_counts):
+        if count.counter_id == counter_id:
+            return i + 1
+    raise ValueError(f'Counter with id {counter_id} not found in counts')
+
+
+def extract_parisian_ranks(global_data: GlobalEcoData) -> ParisianCountersRanks:
+    sorted_counts = sorted(global_data.counts, key=lambda x: -x.count)
+    return ParisianCountersRanks(
+        extract_counter_rank(sorted_counts, EcoCounterId.RIVOLI.value),
+        extract_counter_rank(sorted_counts, EcoCounterId.SEBASTOPOL.value),
+        extract_counter_rank(sorted_counts, EcoCounterId.AUSTERLITZ.value),
+        extract_counter_rank(sorted_counts, EcoCounterId.COURS_LA_REINE.value),
+    )
+
+
+def extract_relevant_facts(
+    count_history: DailyCountHistory, target_range: DayTimeRange, global_data: GlobalEcoData
+) -> List[RelevantFact]:
     if target_range not in count_history.day_to_count:
         raise ValueError('Cannot query a day that is not in history.')
 
     facts: List[RelevantFact] = []
-    facts.append(HistoricalTotalRelevantFact(target_range, 0, extract_total(count_history, target_range)))
+    facts.append(HistoricalTotalRelevantFact(target_range, 0, extract_total(count_history)))
     facts.append(YearTotalRelevantFact(target_range, 0, extract_year_total(count_history, target_range)))
     facts.append(MonthTotalRelevantFact(target_range, 0, extract_month_total(count_history, target_range)))
+    parisian_ranks = extract_parisian_ranks(global_data)
+    facts.append(GlobalEcoRankRelevantFact(target_range, 0, parisian_ranks))
+    facts.append(ParisianGlobalEcoRanksRelevantFact(target_range, 0, parisian_ranks))
 
     facts.append(
         YearDayOfWeekRankRelevantFact(
@@ -779,13 +907,18 @@ def relevant_facts_to_string(
     return random.choice(top_relevant_facts).to_string(language, time_of_publication, dictionary)
 
 
+def load_mock_global_history() -> GlobalEcoData:
+    return GlobalEcoData.from_json(json.load(open('/'.join(__file__.split('/')[:-1]) + '/mock_answer.json')))
+
+
 def test():
     count_history = generate_mock_count_history(400)
+    global_data = load_mock_global_history()
     target_day = list(count_history.day_to_count.keys())[-1]
-    facts = extract_relevant_facts(count_history, target_day)
+    facts = extract_relevant_facts(count_history, target_day, global_data)
     dictionary = Dictionary.from_json(json.load(open('/'.join(__file__.split('/')[:-1] + ['dictionary.json']))))
     for fact in facts:
-        print(fact.to_string(Language.FR, datetime.now(), dictionary))
+        print(capitalize_first_letter(fact.to_string(Language.FR, datetime.now(), dictionary)))
 
 
 def post_text_to_slack(text: str) -> None:
@@ -796,8 +929,11 @@ def post_all_rivoli_facts():
     dictionary = Dictionary.from_json(json.load(open('/'.join(__file__.split('/')[:-1] + ['dictionary.json']))))
     count_history = download_rivoli_count_history()
     target_day = list(count_history.day_to_count.keys())[-1]
-    facts = extract_relevant_facts(count_history, target_day)
-    message = '\n'.join([fact.to_string(Language.FR, datetime.now(), dictionary) for fact in facts])
+    global_data = download_global_data(target_day.start_date)
+    facts = extract_relevant_facts(count_history, target_day, global_data)
+    message = '\n'.join(
+        [capitalize_first_letter(fact.to_string(Language.FR, datetime.now(), dictionary)) for fact in facts]
+    )
     post_text_to_slack(message)
 
 
@@ -806,4 +942,5 @@ def lambda_handler(event, context):
 
 
 if __name__ == '__main__':
+    test()
     post_all_rivoli_facts()
