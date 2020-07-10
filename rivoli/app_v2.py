@@ -4,7 +4,7 @@ import random
 from collections import Counter
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable, Dict, Iterable, List, NamedTuple, Set, Tuple, TypeVar, Union
+from typing import Callable, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple, TypeVar, Union
 
 import requests
 
@@ -251,6 +251,9 @@ class DayTimeRange(TimeRange):
     def __hash__(self):
         return hash(self.start_date.date())
 
+    def __str__(self):
+        return self.start_date.strftime('%m/%d/%Y')
+
     @staticmethod
     def check(date: datetime) -> None:
         if date.hour != 0 or date.minute != 0 or date.second != 0:
@@ -311,6 +314,10 @@ class DailyCountHistory:
         self.day_to_cumsum: Dict[DayTimeRange, int] = self._time_range_to_cumsum(day_to_count)
         self.month_to_cumsum: Dict[MonthTimeRange, int] = self._time_range_to_cumsum(self.month_to_count)
         self.day_of_week_to_best_count: Dict[DayOfWeek, int] = self._extract_day_of_week_to_best_count(day_to_count)
+
+    def head(self, rows: int = 10):
+        for day, count in sorted(self.day_to_count.items(), key=lambda x: x[0].start_date)[:rows]:
+            print(day, count)
 
     @staticmethod
     def _group_by_month(day_to_count: Dict[DayTimeRange, int]) -> Dict[MonthTimeRange, int]:
@@ -470,10 +477,10 @@ def truncate(date: datetime) -> datetime:
     return datetime(date.year, date.month, date.day)
 
 
-def generate_mock_count_history(nb_days: int) -> DailyCountHistory:
+def generate_mock_count_history(nb_days: int, range_: int = 100) -> DailyCountHistory:
     now = truncate(datetime.now())
     start_date = now - timedelta(days=nb_days)
-    day_to_count = {DayTimeRange(start_date + timedelta(days=i)): random.randint(0, 100) for i in range(nb_days)}
+    day_to_count = {DayTimeRange(start_date + timedelta(days=i)): random.randint(0, range_) for i in range(nb_days)}
     return DailyCountHistory(day_to_count)
 
 
@@ -527,12 +534,12 @@ def day_of_week_to_name(day_of_week: DayOfWeek, language: Language, dictionary: 
     return dictionary[day_of_week.to_dictionary_key()][language]
 
 
-def rank_to_ordinal(rank: int, language: Language, dictionary: Dictionary) -> str:
-    if rank == 0:
-        return dictionary[DictionaryKey.FIRST][language]
+def human_rank_to_ordinal(rank: int, language: Language, dictionary: Dictionary) -> str:
     if rank == 1:
-        return dictionary[DictionaryKey.SECOND][language]
+        return dictionary[DictionaryKey.FIRST][language]
     if rank == 2:
+        return dictionary[DictionaryKey.SECOND][language]
+    if rank == 3:
         return dictionary[DictionaryKey.THIRD][language]
     return f'{rank}{dictionary[DictionaryKey.ITH][language]}'
 
@@ -581,11 +588,11 @@ class RankOfTotalRelevantFact(RelevantFact):
 
     @staticmethod
     def _get_best(rank: int, language: Language, dictionary: Dictionary) -> str:
-        raise NotImplementedError()
+        return get_male_best(rank, language, dictionary)
 
     @staticmethod
     def _get_rank_end_of_sentence(target_range: TimeRange, language: Language, dictionary: Dictionary) -> str:
-        raise NotImplementedError()
+        return dictionary[DictionaryKey.DAY_OF_HISTORY][language]
 
     def to_string(self, language: Language, day_of_publication: datetime, dictionary: Dictionary) -> str:
         best = self._get_best(self.rank, language, dictionary)
@@ -655,16 +662,16 @@ class YearOfHistoryRankOfTotalRelevantFact(RankOfTotalRelevantFact):
 
 
 def get_male_best(rank: int, language: Language, dictionary: Dictionary) -> str:
-    ordinal = rank_to_ordinal(rank, language, dictionary)
+    ordinal = human_rank_to_ordinal(rank, language, dictionary)
     best = dictionary[DictionaryKey.MALE_BEST][language]
-    ordinal_best = f'{ordinal} {best}' if rank else best
+    ordinal_best = f'{ordinal} {best}' if rank > 1 else best
     return ordinal_best
 
 
 def get_female_best(rank: int, language: Language, dictionary: Dictionary) -> str:
-    ordinal = rank_to_ordinal(rank, language, dictionary)
+    ordinal = human_rank_to_ordinal(rank, language, dictionary)
     best = dictionary[DictionaryKey.FEMALE_BEST][language]
-    ordinal_best = f'{ordinal} {best}' if rank else best
+    ordinal_best = f'{ordinal} {best}' if rank > 1 else best
     return ordinal_best
 
 
@@ -794,10 +801,12 @@ def extract_rank_and_ties_of_day_of_week(
 def get_rank_of_day(
     count_history: DailyCountHistory,
     target_range: DayTimeRange,
-    comparator: Callable[[DayTimeRange, DayTimeRange], bool],
+    comparator: Optional[Callable[[DayTimeRange, DayTimeRange], bool]],
 ) -> Tuple[int, int]:
     count = count_history.day_to_count[target_range]
-    counts_in_same_year = [count for day, count in count_history.day_to_count.items() if comparator(day, target_range)]
+    counts_in_same_year = [
+        count for day, count in count_history.day_to_count.items() if not comparator or comparator(day, target_range)
+    ]
     return human_rank_in_list(count, counts_in_same_year)
 
 
@@ -842,6 +851,83 @@ def extract_parisian_ranks(global_data: GlobalEcoData) -> ParisianCountersRanks:
     )
 
 
+def transition_to_priority(before: int, after: int) -> int:
+    new_unit = len(str(before)) < len(str(after))
+    if new_unit:
+        return 2
+    if str(after)[0] != str(before)[0]:
+        return 1
+    return 0
+
+
+def get_total_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> HistoricalTotalRelevantFact:
+    total_after = extract_total(count_history)
+    total_before = total_after - count_history.day_to_count[target_range]
+    priority = transition_to_priority(total_before, total_after)
+    return HistoricalTotalRelevantFact(target_range, priority, total_after)
+
+
+def get_year_total_relevant_fact(count_history: DailyCountHistory, target_range: DayTimeRange) -> YearTotalRelevantFact:
+    total_after = extract_year_total(count_history, target_range)
+    total_before = total_after - count_history.day_to_count[target_range]
+    priority = transition_to_priority(total_before, total_after)
+    return YearTotalRelevantFact(target_range, priority, total_after)
+
+
+def get_month_total_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> MonthTotalRelevantFact:
+    total_after = extract_month_total(count_history, target_range)
+    return MonthTotalRelevantFact(target_range, 0, total_after)
+
+
+def get_year_day_of_week_rank_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> YearDayOfWeekRankRelevantFact:
+    rank, ties = extract_rank_and_ties_of_day_of_week(count_history, target_range, same_year=True)
+    return YearDayOfWeekRankRelevantFact(
+        target_range, 2 if rank == 1 else 1 if rank == 2 else 0, target_range.day_of_week(), rank, ties
+    )
+
+
+def get_historical_day_of_week_rank_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> HistoricalDayOfWeekRankRelevantFact:
+    rank, ties = extract_rank_and_ties_of_day_of_week(count_history, target_range)
+    return HistoricalDayOfWeekRankRelevantFact(
+        target_range, 3 if rank == 1 else 2 if rank == 2 else 0, target_range.day_of_week(), rank, ties
+    )
+
+
+def get_day_of_year_rank_of_total_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> DayOfYearRankOfTotalRelevantFact:
+    rank, ties = get_rank_of_day_in_year(count_history, target_range)
+    return DayOfYearRankOfTotalRelevantFact(
+        target_range, 2 if rank == 1 else 1 if rank == 2 else 0, count_history.day_to_count[target_range], rank, ties
+    )
+
+
+def get_day_of_month_rank_of_total_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> DayOfMonthRankOfTotalRelevantFact:
+    rank, ties = get_rank_of_day_in_month(count_history, target_range)
+    return DayOfMonthRankOfTotalRelevantFact(
+        target_range, 1 if rank == 1 else 0, count_history.day_to_count[target_range], rank, ties
+    )
+
+
+def get_historical_rank_relevant_fact(
+    count_history: DailyCountHistory, target_range: DayTimeRange
+) -> RankOfTotalRelevantFact:
+    rank, ties = get_rank_of_day(count_history, target_range, None)
+    return RankOfTotalRelevantFact(
+        target_range, 3 if rank == 1 else 1 if rank <= 5 else 0, count_history.day_to_count[target_range], rank, ties
+    )
+
+
 def extract_relevant_facts(
     count_history: DailyCountHistory, target_range: DayTimeRange, global_data: GlobalEcoData
 ) -> List[RelevantFact]:
@@ -849,45 +935,19 @@ def extract_relevant_facts(
         raise ValueError('Cannot query a day that is not in history.')
 
     facts: List[RelevantFact] = []
-    facts.append(HistoricalTotalRelevantFact(target_range, 0, extract_total(count_history)))
-    facts.append(YearTotalRelevantFact(target_range, 0, extract_year_total(count_history, target_range)))
-    facts.append(MonthTotalRelevantFact(target_range, 0, extract_month_total(count_history, target_range)))
+    facts.append(get_total_relevant_fact(count_history, target_range))
+    facts.append(get_year_total_relevant_fact(count_history, target_range))
+    facts.append(get_month_total_relevant_fact(count_history, target_range))
     parisian_ranks = extract_parisian_ranks(global_data)
-    facts.append(GlobalEcoRankRelevantFact(target_range, 0, parisian_ranks))
+    facts.append(GlobalEcoRankRelevantFact(target_range, 4 if parisian_ranks.rivoli == 1 else 0, parisian_ranks))
     facts.append(ParisianGlobalEcoRanksRelevantFact(target_range, 0, parisian_ranks))
 
-    facts.append(
-        YearDayOfWeekRankRelevantFact(
-            target_range,
-            0,
-            target_range.day_of_week(),
-            *extract_rank_and_ties_of_day_of_week(count_history, target_range, same_year=True),
-        )
-    )
-    facts.append(
-        HistoricalDayOfWeekRankRelevantFact(
-            target_range,
-            0,
-            target_range.day_of_week(),
-            *extract_rank_and_ties_of_day_of_week(count_history, target_range),
-        )
-    )
-    facts.append(
-        DayOfYearRankOfTotalRelevantFact(
-            target_range,
-            0,
-            count_history.day_to_count[target_range],
-            *get_rank_of_day_in_year(count_history, target_range),
-        )
-    )
-    facts.append(
-        DayOfMonthRankOfTotalRelevantFact(
-            target_range,
-            0,
-            count_history.day_to_count[target_range],
-            *get_rank_of_day_in_month(count_history, target_range),
-        )
-    )
+    facts.append(get_year_day_of_week_rank_relevant_fact(count_history, target_range))
+    facts.append(get_historical_day_of_week_rank_relevant_fact(count_history, target_range))
+    facts.append(get_day_of_year_rank_of_total_relevant_fact(count_history, target_range))
+    facts.append(get_day_of_month_rank_of_total_relevant_fact(count_history, target_range))
+
+    facts.append(get_historical_rank_relevant_fact(count_history, target_range))
     if isinstance(count_history, HourlyCountHistory):
         pass  # TODO
     return facts
@@ -912,17 +972,26 @@ def load_mock_global_history() -> GlobalEcoData:
 
 
 def test():
-    count_history = generate_mock_count_history(400)
+    count_history = generate_mock_count_history(400, 10000)
+    print(count_history)
     global_data = load_mock_global_history()
     target_day = list(count_history.day_to_count.keys())[-1]
     facts = extract_relevant_facts(count_history, target_day, global_data)
     dictionary = Dictionary.from_json(json.load(open('/'.join(__file__.split('/')[:-1] + ['dictionary.json']))))
     for fact in facts:
-        print(capitalize_first_letter(fact.to_string(Language.FR, datetime.now(), dictionary)))
+        print(fact.priority, capitalize_first_letter(fact.to_string(Language.FR, datetime.now(), dictionary)))
+    tweet = capitalize_first_letter(extract_top_priority_fact(facts).to_string(Language.FR, datetime.now(), dictionary))
+    print('Tweet: ', tweet)
 
 
 def post_text_to_slack(text: str) -> None:
     requests.post(url=SLACK_TEST_URL, data=json.dumps({'text': text}))
+
+
+def extract_top_priority_fact(facts: List[RelevantFact]) -> RelevantFact:
+    max_priority = max([fact.priority for fact in facts])
+    max_priority_facts = [fact for fact in facts if fact.priority == max_priority]
+    return random.choice(max_priority_facts)
 
 
 def post_all_rivoli_facts():
@@ -932,9 +1001,16 @@ def post_all_rivoli_facts():
     global_data = download_global_data(target_day.start_date)
     facts = extract_relevant_facts(count_history, target_day, global_data)
     message = '\n'.join(
-        [capitalize_first_letter(fact.to_string(Language.FR, datetime.now(), dictionary)) for fact in facts]
+        [
+            '{} {}'.format(
+                fact.priority, capitalize_first_letter(fact.to_string(Language.FR, datetime.now(), dictionary))
+            )
+            for fact in facts
+        ]
     )
     post_text_to_slack(message)
+    tweet = capitalize_first_letter(extract_top_priority_fact(facts).to_string(Language.FR, datetime.now(), dictionary))
+    post_text_to_slack(tweet)
 
 
 def lambda_handler(event, context):
