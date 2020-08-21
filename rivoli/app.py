@@ -26,10 +26,7 @@ class DayCount:
         return cls(date=datetime.fromtimestamp(dict_['date']), count=dict_['count'])
 
     def to_json(self):
-        return {
-            'date': self.date.timestamp(),
-            'count': self.count,
-        }
+        return {'date': self.date.timestamp(), 'count': self.count}
 
     @classmethod
     def from_pair(cls, pair: tuple):
@@ -74,9 +71,7 @@ def day_is_yesterday(day):
 
 
 class RelevantFact:
-    def __init__(
-        self, day, headline, details,
-    ):
+    def __init__(self, day, headline, details):
         self.day: datetime = day
         self.headline: str = headline
         self.details: str = details
@@ -119,7 +114,7 @@ class RelevantFact:
         headline = (
             'Meilleur mois à ce stade d\'avancement avec {} passages. '
             'Précédent record: {} avec {} passages.'.format(
-                count_so_far, datetime_to_french_month(previous_record_month), previous_record_count,
+                count_so_far, datetime_to_french_month(previous_record_month), previous_record_count
             )
         )
         return cls(headline=headline, details='', day=day)
@@ -131,12 +126,11 @@ class RelevantFact:
 
 
 def fetch_data(url) -> list:
-    try:
-        answer = requests.post(url, verify=False)
-        return answer.json()
-    except Exception:
-        logging.error(traceback.format_exc())
-        raise FailedRequestingEcoCounterError()
+    answer = requests.post(url, verify=False)
+    if answer.status_code != 200:
+        logging.info(f'URL attempted: {url}')
+        raise FailedRequestingEcoCounterError(answer.content.decode())
+    return answer.json()
 
 
 def day_in_history(day: datetime, count_history: CountHistory):
