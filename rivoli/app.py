@@ -132,7 +132,7 @@ class RelevantFact:
 
 def fetch_data(url) -> list:
     try:
-        answer = requests.post(url)
+        answer = requests.post(url, verify=False)
         return answer.json()
     except Exception:
         logging.error(traceback.format_exc())

@@ -384,7 +384,7 @@ class HourlyCountHistory(DailyCountHistory):
 
 
 def download_rivoli_count_history() -> DailyCountHistory:
-    answer = requests.post(ECO_COUNTER_URL)
+    answer = requests.post(ECO_COUNTER_URL, verify=False)
     if answer.status_code == 200:
         json_answer = answer.json()
     else:
