@@ -429,7 +429,8 @@ def download_global_data(target_date: datetime) -> GlobalEcoData:
             target_day=stringify(target_date.day),
             target_month=stringify(target_date.month),
             target_year=target_date.year,
-        )
+        ),
+        verify=False,
     )
     dict_ = extract_json(answer)
     return GlobalEcoData.from_json(dict_)
@@ -928,6 +929,10 @@ def get_historical_rank_relevant_fact(
     )
 
 
+def is_any_parisian_winner(ranks: ParisianCountersRanks) -> bool:
+    return any([ranks.austerlitz == 1, ranks.rivoli == 1, ranks.cours_la_reine == 1, ranks.sebastopol == 1])
+
+
 def extract_relevant_facts(
     count_history: DailyCountHistory, target_range: DayTimeRange, global_data: GlobalEcoData
 ) -> List[RelevantFact]:
@@ -940,7 +945,8 @@ def extract_relevant_facts(
     facts.append(get_month_total_relevant_fact(count_history, target_range))
     parisian_ranks = extract_parisian_ranks(global_data)
     facts.append(GlobalEcoRankRelevantFact(target_range, 4 if parisian_ranks.rivoli == 1 else 0, parisian_ranks))
-    facts.append(ParisianGlobalEcoRanksRelevantFact(target_range, 0, parisian_ranks))
+    if is_any_parisian_winner(parisian_ranks):
+        facts.append(ParisianGlobalEcoRanksRelevantFact(target_range, 0, parisian_ranks))
 
     facts.append(get_year_day_of_week_rank_relevant_fact(count_history, target_range))
     facts.append(get_historical_day_of_week_rank_relevant_fact(count_history, target_range))
