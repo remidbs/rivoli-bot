@@ -1,17 +1,19 @@
-import logging
-import requests
-import traceback
-import numpy as np
+import os
 import json
-
-from datetime import datetime, timedelta
+import logging
+import traceback
 from calendar import monthrange
 from collections import Counter
-from typing import List, Tuple, Dict
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, List, Tuple
 
-from rivoli.exceptions import FailedRequestingEcoCounterError
+import numpy as np
+import requests
+
 from rivoli.config import ECO_COUNTER_URL, SLACK_TEST_URL, get_twitter
-from rivoli.utils import parse_mdy, dates_are_on_same_day, date_to_dmy, datetime_to_french_month
+from rivoli.exceptions import FailedRequestingEcoCounterError
+from rivoli.utils import date_to_dmy, dates_are_on_same_day, datetime_to_french_month, parse_mdy
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -304,7 +306,9 @@ def prepare_message_for_std_out(day: datetime, count_history: CountHistory) -> s
 
 
 def prepare_tweet(day: datetime, count_history: CountHistory) -> str:
-    return prepare_message_for_std_out(day, count_history) + '\n#CompteurRivoli'
+    return prepare_message_for_std_out(day, count_history) + (
+        '\n#CompteurRivoli' if os.environ['COUNTER'] == 'RIVOLI' else '\n#CompteurSebastopol'
+    )
 
 
 def pad_answer(answer):
@@ -320,14 +324,17 @@ def get_tweet() -> str:
 
 
 def post_tweet(tweet: str) -> None:
-    tweet = get_tweet()
-    logging.info(tweet)
     twitter_api = get_twitter()
     twitter_api.update_status(tweet)
 
 
 def post_text_to_slack(text: str) -> None:
     requests.post(url=SLACK_TEST_URL, data=json.dumps({'text': text}))
+
+
+class ParisCounters(Enum):
+    RIVOLI = 'RIVOLI'
+    SEBASTOPOL = 'SEBASTOPOL'
 
 
 def lambda_handler(event, context):
