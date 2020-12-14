@@ -52,7 +52,7 @@ class CountHistory:
 
     @classmethod
     def from_url_answer(cls, data: list):
-        pairs = data[:-1]
+        pairs = data
         if {len(pair) for pair in pairs} != {2}:
             raise ValueError(
                 'Expecting a list of pairs, lengths received: {}'.format(
@@ -128,7 +128,7 @@ class RelevantFact:
 
 
 def fetch_data(url) -> list:
-    answer = requests.post(url, verify=False)
+    answer = requests.get(url, verify=False)
     if answer.status_code != 200:
         logging.info(f'URL attempted: {url}')
         raise FailedRequestingEcoCounterError(answer.content.decode())
