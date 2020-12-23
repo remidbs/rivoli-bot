@@ -1,12 +1,27 @@
-from datetime import datetime
+import json
+from datetime import datetime, date
+from typing import Any, Dict, List, Union
 
 
-def parse_mdy(str_: str) -> datetime:
+def parse_mdy(str_: str) -> date:
     return datetime.strptime(str_, '%m/%d/%Y')
 
 
-def date_to_dmy(date_: datetime) -> str:
-    return datetime.strftime(date_, '%d/%m/%Y')
+def date_to_dmy(date_: date) -> str:
+    return date_.strftime('%d/%m/%Y')
+
+
+def parse_ymd(str_: str) -> date:
+    return datetime.strptime(str_, '%Y/%m/%d')
+
+
+def date_to_ymd(date_: date) -> str:
+    return date_.strftime('%Y/%m/%d')
+
+
+def write_json(dict_: Union[List, Dict[str, Any]], filename: str) -> None:
+    with open(filename, 'w') as file_:
+        json.dump(dict_, file_)
 
 
 def dates_are_on_same_day(date_1: datetime, date_2: datetime) -> bool:
