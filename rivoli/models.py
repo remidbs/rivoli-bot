@@ -21,7 +21,12 @@ class DayCount:
         return res
 
     def to_csv(self) -> str:
-        pass  # TODO
+        return f'{date_to_ymd(self.date)},{self.count}'
+
+    @staticmethod
+    def from_csv(str_: str) -> 'DayCount':
+        date_str, count_str = str_.split(',')
+        return DayCount(parse_ymd(date_str), int(count_str))
 
 
 def _check_continuous_and_increasing(days: List[DayCount]) -> None:
@@ -47,10 +52,23 @@ class CountHistory:
         return {'daily_counts': [x.to_json() for x in self.daily_counts]}
 
     def to_csv(self) -> str:
-        pass  # TODO
+        return '\n'.join([count.to_csv() for count in self.daily_counts])
+
+    @staticmethod
+    def from_csv(str_: str) -> 'CountHistory':
+        return CountHistory([DayCount.from_csv(x) for x in str_.split('\n')])
 
 
 @dataclass(frozen=True, eq=True)
 class Month:
     month: int
     year: int
+
+
+@dataclass
+class Tweet:
+    content: str
+
+    def __post_init__(self):
+        if len(self.content) > 280:
+            raise ValueError('Tweet content must contain less than 280 characters.')

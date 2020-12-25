@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Callable, Dict, Iterable, List, Optional, Union
 
-from rivoli.models import CountHistory, Month
+from rivoli.models import CountHistory, Month, Tweet
 
 
 def day_is_today(day: date) -> bool:
@@ -81,7 +81,11 @@ def _get_month(day: date) -> Month:
 
 
 def _number_is_funny(number: int) -> bool:
-    raise NotImplementedError()
+    if len(set(str(number))) == 1 and len(str(number)) >= 3:
+        return True
+    if number % (10 ** (len(str(number)) - 1)) == 0:
+        return True
+    return False
 
 
 def _group_by_month(count_history: CountHistory) -> Dict[Month, List[int]]:
@@ -322,6 +326,19 @@ def _elect_event(events: List[Event]) -> Event:
     return events[_randomly_choose_index_among_max_values(event_scores)]
 
 
-def _compute_relevant_fact(day: date, count_history: CountHistory) -> Event:
+def _compute_most_interesting_fact(day: date, count_history: CountHistory) -> Event:
     events = _extract_counting_events(day, count_history, _EVENT_COMPUTERS)
     return _elect_event(events)
+
+
+def _compute_first_half_of_tweet(day: date, count_history: CountHistory, publish_date: date) -> str:
+    return
+
+
+def _event_to_fact(event: Event) -> str:
+    return event.default_message()
+
+
+def build_tweet(day: date, count_history: CountHistory, publish_date: date) -> Tweet:
+    event = _compute_most_interesting_fact(day, count_history)
+    return Tweet(' '.join([_compute_first_half_of_tweet(day, count_history, publish_date), _event_to_fact(event)]))

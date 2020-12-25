@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 
 
 def parse_mdy(str_: str) -> date:
-    return datetime.strptime(str_, '%m/%d/%Y')
+    return datetime.strptime(str_, '%m/%d/%Y').date()
 
 
 def date_to_dmy(date_: date) -> str:
@@ -12,7 +12,7 @@ def date_to_dmy(date_: date) -> str:
 
 
 def parse_ymd(str_: str) -> date:
-    return datetime.strptime(str_, '%Y/%m/%d')
+    return datetime.strptime(str_, '%Y/%m/%d').date()
 
 
 def date_to_ymd(date_: date) -> str:
@@ -22,6 +22,11 @@ def date_to_ymd(date_: date) -> str:
 def write_json(dict_: Union[List, Dict[str, Any]], filename: str) -> None:
     with open(filename, 'w') as file_:
         json.dump(dict_, file_)
+
+
+def write_str(str_: str, filename: str) -> None:
+    with open(filename, 'w') as file_:
+        file_.write(str_)
 
 
 def dates_are_on_same_day(date_1: datetime, date_2: datetime) -> bool:

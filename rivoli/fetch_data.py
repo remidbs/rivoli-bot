@@ -7,7 +7,7 @@ import requests
 from rivoli.config import ECO_COUNTER_URL_TEMPLATE
 from rivoli.exceptions import FailedRequestingEcoCounterError
 from rivoli.models import CountHistory, DayCount
-from rivoli.utils import parse_mdy, write_json
+from rivoli.utils import parse_mdy, write_json, write_str
 
 
 class Counter(Enum):
@@ -67,7 +67,10 @@ def _fetch_data_from_ecocounter(counter_name: Counter) -> CountHistory:
 
 def fetch_and_dump_data(counter_name: Counter, filename: str) -> None:
     count_history = _fetch_data_from_ecocounter(counter_name)
-    write_json(count_history.to_json(), filename)
+    if '.csv' in filename:
+        write_str(count_history.to_csv(), filename)
+    else:
+        write_json(count_history.to_json(), filename)
 
 
 def cli():
