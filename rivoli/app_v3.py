@@ -2,9 +2,11 @@ import random
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
+from math import ceil
 from typing import Callable, Dict, Iterable, List, Optional, Union
 
 from rivoli.models import CountHistory, Month, Tweet
+from rivoli.utils import date_to_dmy, month_to_french_word
 
 
 def day_is_today(day: date) -> bool:
@@ -131,6 +133,10 @@ class HistoricalRecordEvent:
     def default_score() -> float:
         return 1.0
 
+    @staticmethod
+    def default_message() -> str:
+        return 'Record historique !'
+
 
 @dataclass
 class MonthRecordEvent:
@@ -143,11 +149,33 @@ class MonthRecordEvent:
             return 0
         return 0.5
 
+    @staticmethod
+    def default_message() -> str:
+        return 'Record du mois !'
+
+
+def _round_to_twentieth(float_: float) -> int:
+    if float_ < 0 or float_ > 1:
+        raise ValueError('Expecting float between 0 and 1')
+    return int(ceil(float_ * 20) * 5)
+
+
+def _capitalize_first_letter(str_: str) -> str:
+    if not str_:
+        return str_
+    return str_[0].upper() + str_[1:]
+
 
 @dataclass
 class DayHistoricalRankEvent:
     rank: int
     among_nb_days: int
+
+    def __post_init__(self):
+        if self.rank >= self.among_nb_days:
+            raise ValueError(
+                f'rank must be strictly smaller than total nb days (resp. {self.rank} and {self.among_nb_days})'
+            )
 
     def default_score(self) -> float:
         if self.rank / self.among_nb_days <= 0.05:
@@ -155,6 +183,22 @@ class DayHistoricalRankEvent:
         if self.rank / self.among_nb_days <= 0.3:
             return 0.5
         return 0
+
+    def default_message(self) -> str:
+        if self.rank <= 10:
+            return _capitalize_first_letter(f'{_build_french_ordinal(self.rank)}meilleur jour historique.')
+        top = _round_to_twentieth((self.rank + 1) / self.among_nb_days)
+        return f'Top {top}%.'
+
+
+def _month_to_french(month: Month) -> str:
+    return f'{month_to_french_word(month.month)} {month.year}'
+
+
+def _build_french_ordinal(rank: int) -> str:
+    if rank == 0:
+        return ''
+    return f'{rank + 1}ème '
 
 
 @dataclass
@@ -167,6 +211,11 @@ class MonthSummaryEvent:
     def default_score() -> float:
         return 0.95
 
+    def default_message(self) -> str:
+        month_name = _month_to_french(self.month)
+        french_ordinal = _build_french_ordinal(self.month_rank)
+        return f'{month_name} : {french_ordinal}meilleur mois de l\'histoire avec {self.month_count} passages.'
+
 
 @dataclass
 class YearSummaryEvent:
@@ -178,6 +227,10 @@ class YearSummaryEvent:
     def default_score() -> float:
         return 0.95
 
+    def default_message(self) -> str:
+        french_ordinal = _build_french_ordinal(self.year_rank)
+        return f'{self.year} : {french_ordinal}meilleure année de l\'histoire avec {self.year_count} passages.'
+
 
 @dataclass
 class YearTotalEvent:
@@ -187,6 +240,9 @@ class YearTotalEvent:
         if _number_is_funny(self.year_total):
             return 0.75
         return 0.5
+
+    def default_message(self) -> str:
+        return f'{self.year_total} passages depuis le début de l\'année.'
 
 
 @dataclass
@@ -198,6 +254,9 @@ class MonthTotalEvent:
             return 0.75
         return 0.5
 
+    def default_message(self) -> str:
+        return f'{self.month_total} passages depuis le début du mois.'
+
 
 @dataclass
 class HistoricalTotalEvent:
@@ -207,6 +266,9 @@ class HistoricalTotalEvent:
         if _number_is_funny(self.historical_total):
             return 0.75
         return 0.5
+
+    def default_message(self) -> str:
+        return f'{self.historical_total} passages depuis l\'installation du compteur.'
 
 
 Event = Union[
@@ -331,8 +393,19 @@ def _compute_most_interesting_fact(day: date, count_history: CountHistory) -> Ev
     return _elect_event(events)
 
 
+def _compute_day_expression(day: date, publish_date: date) -> str:
+    if day == publish_date:
+        return 'Aujourd\'hui'
+    if publish_date - timedelta(days=1) == day:
+        return 'Hier'
+    date_str = date_to_dmy(day)
+    return f'Le {date_str}'
+
+
 def _compute_first_half_of_tweet(day: date, count_history: CountHistory, publish_date: date) -> str:
-    return
+    day_expression = _compute_day_expression(day, publish_date)
+    nb_occurrences_this_day = _safe_get_count(day, count_history)
+    return f'{day_expression}, il y a eu {nb_occurrences_this_day} cyclistes.'
 
 
 def _event_to_fact(event: Event) -> str:

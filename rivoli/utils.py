@@ -33,7 +33,7 @@ def dates_are_on_same_day(date_1: datetime, date_2: datetime) -> bool:
     return date_1.day == date_2.day and date_1.month == date_2.month and date_1.year == date_2.year
 
 
-def month_to_word(month: int) -> str:
+def month_to_french_word(month: int) -> str:
     map_ = {
         1: 'Janvier',
         2: 'Février',
@@ -51,7 +51,7 @@ def month_to_word(month: int) -> str:
     return map_[month]
 
 
-def datetime_to_french_month(date_: datetime) -> str:
-    year = datetime.strftime(date_, '%Y')
-    month = month_to_word(date_.month)
+def date_to_french_month(date_: date) -> str:
+    year = date.strftime(date_, '%Y')
+    month = month_to_french_word(date_.month)
     return '{} {}'.format(month, year)

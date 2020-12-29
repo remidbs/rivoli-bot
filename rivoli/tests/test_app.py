@@ -1,10 +1,20 @@
 import os
-from rivoli.utils import parse_ymd
-from rivoli.models import CountHistory, DayCount, Month
-import pytest
 from datetime import date, timedelta
 
+import pytest
 from rivoli.app_v3 import (
+    DayHistoricalRankEvent,
+    HistoricalRecordEvent,
+    HistoricalTotalEvent,
+    MonthRecordEvent,
+    MonthSummaryEvent,
+    MonthTotalEvent,
+    YearSummaryEvent,
+    YearTotalEvent,
+    _build_french_ordinal,
+    _capitalize_first_letter,
+    _compute_day_expression,
+    _compute_first_half_of_tweet,
     _cumulate,
     _day_is_absolute_maximum,
     _day_is_first_day_of_month,
@@ -19,12 +29,16 @@ from rivoli.app_v3 import (
     _group_by_month,
     _group_by_year,
     _month_to_cumulate_sums,
+    _month_to_french,
     _number_is_funny,
     _optimistic_rank,
+    _round_to_twentieth,
     _safe_get_count,
     day_is_today,
     day_is_yesterday,
 )
+from rivoli.models import CountHistory, DayCount, Month
+from rivoli.utils import parse_ymd
 
 
 def test_day_is_today():
@@ -221,3 +235,99 @@ def test_number_is_funny():
     assert not _number_is_funny(1001)
     assert not _number_is_funny(10001)
     assert not _number_is_funny(999990)
+
+
+def test_compute_day_expression():
+    assert _compute_day_expression(date.today(), date.today()) == 'Aujourd\'hui'
+    assert _compute_day_expression(date.today() - timedelta(days=1), date.today()) == 'Hier'
+    assert _compute_day_expression(date(2020, 1, 1), date.today()) == 'Le 01/01/2020'
+    assert _compute_day_expression(date(2020, 1, 1), date(2020, 1, 1)) == 'Aujourd\'hui'
+    assert _compute_day_expression(date(2020, 1, 1), date(2020, 1, 2)) == 'Hier'
+    assert _compute_day_expression(date(2020, 1, 1), date(2020, 1, 3)) == 'Le 01/01/2020'
+
+
+def test_compute_first_half_of_tweet():
+    count_history = _get_small_count_history()
+    expected = 'Le 31/08/2020, il y a eu 100 cyclistes.'
+    assert count_history.daily_counts[0].date == date(2020, 8, 31)
+    assert _compute_first_half_of_tweet(count_history.daily_counts[0].date, count_history, date.today()) == expected
+    expected = 'Aujourd\'hui, il y a eu 100 cyclistes.'
+    assert (
+        _compute_first_half_of_tweet(count_history.daily_counts[0].date, count_history, date(2020, 8, 31)) == expected
+    )
+    expected = 'Hier, il y a eu 100 cyclistes.'
+    assert _compute_first_half_of_tweet(count_history.daily_counts[0].date, count_history, date(2020, 9, 1)) == expected
+    expected = 'Hier, il y a eu 120 cyclistes.'
+    assert (
+        _compute_first_half_of_tweet(count_history.daily_counts[-1].date, count_history, date(2020, 9, 6)) == expected
+    )
+
+
+def test_round_to_twentieth():
+    assert _round_to_twentieth(0.23) == 25
+    assert _round_to_twentieth(0) == 0
+    assert _round_to_twentieth(0.0001) == 5
+    assert _round_to_twentieth(1) == 100
+    assert _round_to_twentieth(0.3249) == 35
+    assert _round_to_twentieth(0.23408) == 25
+
+
+def test_month_to_french():
+    assert _month_to_french(Month(2, 2020)) == 'Février 2020'
+    assert _month_to_french(Month(5, 2010)) == 'Mai 2010'
+
+
+def test_build_french_ordinal():
+    assert _build_french_ordinal(1) == '2ème '
+    assert _build_french_ordinal(0) == ''
+    assert _build_french_ordinal(4) == '5ème '
+    assert _build_french_ordinal(5) == '6ème '
+    assert _build_french_ordinal(20) == '21ème '
+
+
+def test_default_message():
+    assert MonthRecordEvent(date.today()).default_message() == 'Record du mois !'
+
+    assert HistoricalRecordEvent().default_message() == 'Record historique !'
+
+    assert DayHistoricalRankEvent(0, 100).default_message() == 'Meilleur jour historique.'
+    assert DayHistoricalRankEvent(50, 100).default_message() == 'Top 55%.'
+    assert DayHistoricalRankEvent(99, 100).default_message() == 'Top 100%.'
+    assert DayHistoricalRankEvent(40, 1000).default_message() == 'Top 5%.'
+    assert DayHistoricalRankEvent(4, 100).default_message() == '5ème meilleur jour historique.'
+    assert DayHistoricalRankEvent(140, 159).default_message() == 'Top 90%.'
+
+    expected = 'Février 2020 : 5ème meilleur mois de l\'histoire avec 14000 passages.'
+    assert MonthSummaryEvent(Month(2, 2020), 14000, 4).default_message() == expected
+    expected = 'Février 2020 : meilleur mois de l\'histoire avec 14000 passages.'
+    assert MonthSummaryEvent(Month(2, 2020), 14000, 0).default_message() == expected
+    expected = 'Mars 2010 : meilleur mois de l\'histoire avec 15000 passages.'
+    assert MonthSummaryEvent(Month(3, 2010), 15000, 0).default_message() == expected
+    expected = 'Mars 2010 : 11ème meilleur mois de l\'histoire avec 15000 passages.'
+    assert MonthSummaryEvent(Month(3, 2010), 15000, 10).default_message() == expected
+
+    expected = '2020 : 5ème meilleure année de l\'histoire avec 14000 passages.'
+    assert YearSummaryEvent(2020, 14000, 4).default_message() == expected
+    expected = '2020 : meilleure année de l\'histoire avec 14000 passages.'
+    assert YearSummaryEvent(2020, 14000, 0).default_message() == expected
+    expected = '2010 : meilleure année de l\'histoire avec 15000 passages.'
+    assert YearSummaryEvent(2010, 15000, 0).default_message() == expected
+    expected = '2010 : 11ème meilleure année de l\'histoire avec 15000 passages.'
+    assert YearSummaryEvent(2010, 15000, 10).default_message() == expected
+
+    assert YearTotalEvent(15000).default_message() == '15000 passages depuis le début de l\'année.'
+    assert YearTotalEvent(34003).default_message() == '34003 passages depuis le début de l\'année.'
+
+    assert MonthTotalEvent(15000).default_message() == '15000 passages depuis le début du mois.'
+    assert MonthTotalEvent(34003).default_message() == '34003 passages depuis le début du mois.'
+
+    assert HistoricalTotalEvent(15000).default_message() == '15000 passages depuis l\'installation du compteur.'
+    assert HistoricalTotalEvent(34003).default_message() == '34003 passages depuis l\'installation du compteur.'
+
+
+def test_capitalize_first_letter():
+    assert _capitalize_first_letter('4ème') == '4ème'
+    assert _capitalize_first_letter('meilleur') == 'Meilleur'
+    assert _capitalize_first_letter('Foo') == 'Foo'
+    assert _capitalize_first_letter('bar') == 'Bar'
+    assert _capitalize_first_letter('') == ''
