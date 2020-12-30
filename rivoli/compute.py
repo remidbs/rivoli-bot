@@ -388,8 +388,13 @@ def _elect_event(events: List[Event]) -> Event:
     return events[_randomly_choose_index_among_max_values(event_scores)]
 
 
+def _remove_posterior_days(day: date, count_history: CountHistory) -> CountHistory:
+    return CountHistory([cnt for cnt in count_history.daily_counts if cnt.date <= day])
+
+
 def _compute_most_interesting_fact(day: date, count_history: CountHistory) -> Event:
-    events = _extract_counting_events(day, count_history, _EVENT_COMPUTERS)
+    truncated_count_history = _remove_posterior_days(day, count_history)
+    events = _extract_counting_events(day, truncated_count_history, _EVENT_COMPUTERS)
     return _elect_event(events)
 
 
