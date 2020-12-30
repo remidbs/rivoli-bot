@@ -2,7 +2,7 @@ import os
 from datetime import date, timedelta
 
 import pytest
-from rivoli.app_v3 import (
+from rivoli.compute import (
     DayHistoricalRankEvent,
     HistoricalRecordEvent,
     HistoricalTotalEvent,

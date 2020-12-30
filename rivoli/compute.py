@@ -415,3 +415,12 @@ def _event_to_fact(event: Event) -> str:
 def build_tweet(day: date, count_history: CountHistory, publish_date: date) -> Tweet:
     event = _compute_most_interesting_fact(day, count_history)
     return Tweet(' '.join([_compute_first_half_of_tweet(day, count_history, publish_date), _event_to_fact(event)]))
+
+
+# TODO: wrap tweepy
+# TODO: cli app_v3
+# TODO: test e2e
+# TODO: Readme.md
+# TODO: requirements.txt
+# TODO: docstring
+# TODO: precommit
