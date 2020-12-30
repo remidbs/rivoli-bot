@@ -1,38 +1,62 @@
-import os
-from typing import Optional
+from dataclasses import dataclass
+from enum import Enum
 
-import tweepy
-
-from rivoli.secrets import SECRETS, ECO_COUNTER_URL_TEMPLATE
-
-# COUNTER = os.environ['COUNTER']
-# if COUNTER == 'RIVOLI':
-#     ECO_COUNTER_URL = SECRETS['ecoCounterUrl']
-#     TWITTER_CUSTOMER_API_KEY = SECRETS['twitterCustomerAPIKey']
-#     TWITTER_CUSTOMER_API_SECRET_KEY = SECRETS['twitterCustomerAPISecretKey']
-#     TWITTER_ACCESS_TOKEN = SECRETS['twitterAccessToken']
-#     TWITTER_ACCESS_TOKEN_SECRET = SECRETS['twitterAccessTokenSecret']
-# elif COUNTER == 'SEBASTOPOL':
-#     ECO_COUNTER_URL = SECRETS['sebastopolUrl']
-#     TWITTER_CUSTOMER_API_KEY = SECRETS['sebastopolTwitterCustomerAPIKey']
-#     TWITTER_CUSTOMER_API_SECRET_KEY = SECRETS['sebastopolTwitterCustomerAPISecretKey']
-#     TWITTER_ACCESS_TOKEN = SECRETS['sebastopolTwitterAccessToken']
-#     TWITTER_ACCESS_TOKEN_SECRET = SECRETS['sebastopolTwitterAccessTokenSecret']
-# else:
-#     raise ValueError(f'Unknown counter {COUNTER}')
+from rivoli.secrets import (
+    RIVOLI_TWITTER_ACCESS_TOKEN,
+    RIVOLI_TWITTER_ACCESS_TOKEN_SECRET,
+    RIVOLI_TWITTER_CUSTOMER_API_KEY,
+    RIVOLI_TWITTER_CUSTOMER_API_SECRET_KEY,
+    SEBASTOPOL_TWITTER_ACCESS_TOKEN,
+    SEBASTOPOL_TWITTER_ACCESS_TOKEN_SECRET,
+    SEBASTOPOL_TWITTER_CUSTOMER_API_KEY,
+    SEBASTOPOL_TWITTER_CUSTOMER_API_SECRET_KEY,
+)
 
 
-# ECO_COUNTER_GLOBAL_URL = SECRETS['ecoCounterGlobal']
-# ZAPIER_WEBHOOK_URL = SECRETS['zapierWebhookUrl']
-# SLACK_TEST_URL = SECRETS['slackTestUrl']
+@dataclass
+class TwitterSettings:
+    twitter_customer_api_key: str
+    twitter_customer_api_secret_key: str
+    twitter_access_token: str
+    twitter_access_token_secret: str
 
-# twitter_api: Optional[tweepy.API] = None
+
+@dataclass
+class Settings:
+    twitter: TwitterSettings
+    counter_id: str
 
 
-def get_twitter() -> tweepy.API:
-    global twitter_api
-    if not twitter_api:
-        auth = tweepy.OAuthHandler(TWITTER_CUSTOMER_API_KEY, TWITTER_CUSTOMER_API_SECRET_KEY)
-        auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
-        twitter_api = tweepy.API(auth)
-    return twitter_api
+class CounterName(Enum):
+    RIVOLI = 'RIVOLI'
+    SEBASTOPOL = 'SEBASTOPOL'
+
+
+_ECO_COUNTER_ID = {
+    CounterName.RIVOLI: '100154889',
+    CounterName.SEBASTOPOL: '100158705',
+}
+
+
+def get_settings(counter: CounterName) -> Settings:
+    if counter == CounterName.RIVOLI:
+        return Settings(
+            TwitterSettings(
+                RIVOLI_TWITTER_CUSTOMER_API_KEY,
+                RIVOLI_TWITTER_CUSTOMER_API_SECRET_KEY,
+                RIVOLI_TWITTER_ACCESS_TOKEN,
+                RIVOLI_TWITTER_ACCESS_TOKEN_SECRET,
+            ),
+            _ECO_COUNTER_ID[counter],
+        )
+    if counter == CounterName.SEBASTOPOL:
+        return Settings(
+            TwitterSettings(
+                SEBASTOPOL_TWITTER_CUSTOMER_API_KEY,
+                SEBASTOPOL_TWITTER_CUSTOMER_API_SECRET_KEY,
+                SEBASTOPOL_TWITTER_ACCESS_TOKEN,
+                SEBASTOPOL_TWITTER_ACCESS_TOKEN_SECRET,
+            ),
+            _ECO_COUNTER_ID[counter],
+        )
+    raise NotImplementedError(f'Counter {counter} has no settings.')

@@ -1,33 +1,17 @@
 import argparse
-from enum import Enum
 from typing import Any, List, Tuple
 
 import requests
 
-from rivoli.config import ECO_COUNTER_URL_TEMPLATE
+from rivoli.secrets import ECO_COUNTER_URL_TEMPLATE
+from rivoli.config import CounterName, get_settings
 from rivoli.exceptions import FailedRequestingEcoCounterError
 from rivoli.models import CountHistory, DayCount
 from rivoli.utils import parse_mdy, write_json, write_str
 
 
-class Counter(Enum):
-    RIVOLI = 'RIVOLI'
-    SEBASTOPOL = 'SEBASTOPOL'
-
-
-_ECO_COUNTER_ID = {
-    Counter.RIVOLI: '100154889',
-    Counter.SEBASTOPOL: '100158705',
-}
-
-
-def test_missing_counter_ids():
-    for counter in list(Counter):
-        assert counter in _ECO_COUNTER_ID
-
-
-def _build_url(counter_name: Counter) -> str:
-    counter_id = _ECO_COUNTER_ID[counter_name]
+def _build_url(counter_name: CounterName) -> str:
+    counter_id = get_settings(counter_name)
     return ECO_COUNTER_URL_TEMPLATE.format(counter_id, counter_id)
 
 
@@ -57,7 +41,7 @@ def _check_response_content(response_content: Any) -> List[Tuple[str, str]]:
     return formatted_result
 
 
-def _fetch_data_from_ecocounter(counter_name: Counter) -> CountHistory:
+def _fetch_data_from_ecocounter(counter_name: CounterName) -> CountHistory:
     url = _build_url(counter_name)
     response = requests.get(url, verify=False)
     if response.status_code != 200:
@@ -65,7 +49,7 @@ def _fetch_data_from_ecocounter(counter_name: Counter) -> CountHistory:
     return _build_count_history(_check_response_content(response.json()))
 
 
-def fetch_and_dump_data(counter_name: Counter, filename: str) -> None:
+def fetch_and_dump_data(counter_name: CounterName, filename: str) -> None:
     count_history = _fetch_data_from_ecocounter(counter_name)
     if '.csv' in filename:
         write_str(count_history.to_csv(), filename)
@@ -76,9 +60,9 @@ def fetch_and_dump_data(counter_name: Counter, filename: str) -> None:
 def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('filename', type=str)
-    parser.add_argument('counter', type=str, choices=list(map(lambda x: x.value, list(Counter))))
+    parser.add_argument('counter', type=str, choices=list(map(lambda x: x.value, list(CounterName))))
     args = parser.parse_args()
-    fetch_and_dump_data(Counter(args.counter), args.filename)
+    fetch_and_dump_data(CounterName(args.counter), args.filename)
 
 
 if __name__ == '__main__':
