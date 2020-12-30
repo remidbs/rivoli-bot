@@ -7,6 +7,10 @@ def parse_mdy(str_: str) -> date:
     return datetime.strptime(str_, '%m/%d/%Y').date()
 
 
+def parse_dmy(str_: str) -> date:
+    return datetime.strptime(str_, '%d/%m/%Y').date()
+
+
 def date_to_dmy(date_: date) -> str:
     return date_.strftime('%d/%m/%Y')
 
@@ -27,6 +31,16 @@ def write_json(dict_: Union[List, Dict[str, Any]], filename: str) -> None:
 def write_str(str_: str, filename: str) -> None:
     with open(filename, 'w') as file_:
         file_.write(str_)
+
+
+def load_json(filename: str) -> Union[List, Dict[str, Any]]:
+    with open(filename) as file_:
+        return json.load(file_)
+
+
+def load_file(filename: str) -> str:
+    with open(filename) as file_:
+        return file_.read()
 
 
 def dates_are_on_same_day(date_1: datetime, date_2: datetime) -> bool:
@@ -55,3 +69,9 @@ def date_to_french_month(date_: date) -> str:
     year = date.strftime(date_, '%Y')
     month = month_to_french_word(date_.month)
     return '{} {}'.format(month, year)
+
+
+def check_str(var: Any) -> str:
+    if not isinstance(var, str):
+        raise ValueError(f'Expecting str, got {type(var)}')
+    return var

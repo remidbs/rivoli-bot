@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from rivoli.secrets import (
+    RIVOLI_BOT_SLACK,
     RIVOLI_TWITTER_ACCESS_TOKEN,
     RIVOLI_TWITTER_ACCESS_TOKEN_SECRET,
     RIVOLI_TWITTER_CUSTOMER_API_KEY,
@@ -11,6 +13,7 @@ from rivoli.secrets import (
     SEBASTOPOL_TWITTER_CUSTOMER_API_KEY,
     SEBASTOPOL_TWITTER_CUSTOMER_API_SECRET_KEY,
 )
+from rivoli.utils import check_str
 
 
 @dataclass
@@ -20,10 +23,25 @@ class TwitterSettings:
     twitter_access_token: str
     twitter_access_token_secret: str
 
+    def __post_init__(self) -> None:
+        check_str(self.twitter_customer_api_key)
+        check_str(self.twitter_customer_api_secret_key)
+        check_str(self.twitter_access_token)
+        check_str(self.twitter_access_token_secret)
+
+
+@dataclass
+class SlackSettings:
+    url: str
+
+    def __post_init__(self) -> None:
+        check_str(self.url)
+
 
 @dataclass
 class Settings:
-    twitter: TwitterSettings
+    twitter: Optional[TwitterSettings]
+    slack: Optional[SlackSettings]
     counter_id: str
 
 
@@ -47,6 +65,7 @@ def get_settings(counter: CounterName) -> Settings:
                 RIVOLI_TWITTER_ACCESS_TOKEN,
                 RIVOLI_TWITTER_ACCESS_TOKEN_SECRET,
             ),
+            SlackSettings(RIVOLI_BOT_SLACK),
             _ECO_COUNTER_ID[counter],
         )
     if counter == CounterName.SEBASTOPOL:
@@ -57,6 +76,7 @@ def get_settings(counter: CounterName) -> Settings:
                 SEBASTOPOL_TWITTER_ACCESS_TOKEN,
                 SEBASTOPOL_TWITTER_ACCESS_TOKEN_SECRET,
             ),
+            SlackSettings(RIVOLI_BOT_SLACK),
             _ECO_COUNTER_ID[counter],
         )
     raise NotImplementedError(f'Counter {counter} has no settings.')

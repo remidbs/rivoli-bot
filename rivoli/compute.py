@@ -417,10 +417,11 @@ def build_tweet(day: date, count_history: CountHistory, publish_date: date) -> T
     return Tweet(' '.join([_compute_first_half_of_tweet(day, count_history, publish_date), _event_to_fact(event)]))
 
 
-# TODO: wrap tweepy
-# TODO: cli app_v3
-# TODO: test e2e
-# TODO: Readme.md
+# TODO: tests e2e
+# TODO: Procfile
 # TODO: requirements.txt
+# TODO: fetch_data template
+# TODO: Readme.md
 # TODO: docstring
 # TODO: precommit
+# TODO: github cicd for tests

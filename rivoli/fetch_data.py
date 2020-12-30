@@ -59,8 +59,8 @@ def fetch_and_dump_data(counter_name: CounterName, filename: str) -> None:
 
 def cli():
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename', type=str)
-    parser.add_argument('counter', type=str, choices=list(map(lambda x: x.value, list(CounterName))))
+    parser.add_argument('--filename', type=str)
+    parser.add_argument('--counter', type=str, choices=list(map(lambda x: x.value, list(CounterName))))
     args = parser.parse_args()
     fetch_and_dump_data(CounterName(args.counter), args.filename)
 
