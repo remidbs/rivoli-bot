@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from rivoli.secrets import (
+from rivoli.params import (
     RIVOLI_BOT_SLACK,
     RIVOLI_TWITTER_ACCESS_TOKEN,
     RIVOLI_TWITTER_ACCESS_TOKEN_SECRET,

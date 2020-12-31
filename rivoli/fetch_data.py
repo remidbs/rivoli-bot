@@ -3,7 +3,7 @@ from typing import Any, List, Tuple
 
 import requests
 
-from rivoli.secrets import RIVOLI_URL, SEBASTOPOL_URL
+from rivoli.params import RIVOLI_URL, SEBASTOPOL_URL
 from rivoli.config import CounterName
 from rivoli.exceptions import FailedRequestingEcoCounterError
 from rivoli.models import CountHistory, DayCount

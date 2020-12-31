@@ -1,7 +1,7 @@
 import random
 import string
 import traceback
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Callable, List
 
 import pytz
@@ -10,7 +10,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from rivoli.config import CounterName, get_settings
 from rivoli.fetch_data import fetch_and_dump_data
 from rivoli.main import SlackHandler, main, post_to_slack
-from rivoli.secrets import RIVOLI_BOT_SLACK
+from rivoli.params import RIVOLI_BOT_SLACK
 
 SCHED = BlockingScheduler()
 
@@ -26,7 +26,7 @@ def _fetch_and_post_to_slack(counter_name: CounterName) -> None:
     if not settings.slack:
         raise ValueError('Expecting slack url to be defined.')
     handler = SlackHandler(settings.slack)
-    main(filename, handler, date.today())
+    main(filename, handler, date.today() - timedelta(days=1))
 
 
 def _post_exceptions_to_slack(func: Callable, args: List[Any]):
@@ -37,12 +37,12 @@ def _post_exceptions_to_slack(func: Callable, args: List[Any]):
         post_to_slack(RIVOLI_BOT_SLACK, message)
 
 
-@SCHED.scheduled_job('cron', hour=17, minute=58, timezone=pytz.timezone('Europe/Paris'))
+@SCHED.scheduled_job('cron', hour=19, minute=49, timezone=pytz.timezone('Europe/Paris'))
 def rivoli_post_to_slack():
     _post_exceptions_to_slack(_fetch_and_post_to_slack, [CounterName.RIVOLI])
 
 
-@SCHED.scheduled_job('cron', hour=17, minute=58, timezone=pytz.timezone('Europe/Paris'))
+@SCHED.scheduled_job('cron', hour=19, minute=49, timezone=pytz.timezone('Europe/Paris'))
 def sebastopol_post_to_slack():
     _post_exceptions_to_slack(_fetch_and_post_to_slack, [CounterName.SEBASTOPOL])
 
