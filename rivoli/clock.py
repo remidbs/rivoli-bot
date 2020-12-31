@@ -37,12 +37,12 @@ def _post_exceptions_to_slack(func: Callable, args: List[Any]):
         post_to_slack(RIVOLI_BOT_SLACK, message)
 
 
-@SCHED.scheduled_job('cron', hour=17, minute=51, timezone=pytz.timezone('Europe/Paris'))
+@SCHED.scheduled_job('cron', hour=17, minute=58, timezone=pytz.timezone('Europe/Paris'))
 def rivoli_post_to_slack():
     _post_exceptions_to_slack(_fetch_and_post_to_slack, [CounterName.RIVOLI])
 
 
-@SCHED.scheduled_job('cron', hour=17, minute=51, timezone=pytz.timezone('Europe/Paris'))
+@SCHED.scheduled_job('cron', hour=17, minute=58, timezone=pytz.timezone('Europe/Paris'))
 def sebastopol_post_to_slack():
     _post_exceptions_to_slack(_fetch_and_post_to_slack, [CounterName.SEBASTOPOL])
 
