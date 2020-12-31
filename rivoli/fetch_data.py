@@ -3,16 +3,19 @@ from typing import Any, List, Tuple
 
 import requests
 
-from rivoli.secrets import ECO_COUNTER_URL_TEMPLATE
-from rivoli.config import CounterName, get_settings
+from rivoli.secrets import RIVOLI_URL, SEBASTOPOL_URL
+from rivoli.config import CounterName
 from rivoli.exceptions import FailedRequestingEcoCounterError
 from rivoli.models import CountHistory, DayCount
 from rivoli.utils import parse_mdy, write_json, write_str
 
 
 def _build_url(counter_name: CounterName) -> str:
-    counter_id = get_settings(counter_name)
-    return ECO_COUNTER_URL_TEMPLATE.format(counter_id, counter_id)
+    if counter_name == counter_name.SEBASTOPOL:
+        return SEBASTOPOL_URL
+    if counter_name == counter_name.RIVOLI:
+        return RIVOLI_URL
+    raise NotImplementedError(f'URL for counter {counter_name} is missing.')
 
 
 def _build_count_history(pairs: List[Tuple[str, str]]) -> CountHistory:
@@ -45,7 +48,7 @@ def _fetch_data_from_ecocounter(counter_name: CounterName) -> CountHistory:
     url = _build_url(counter_name)
     response = requests.get(url, verify=False)
     if response.status_code != 200:
-        raise FailedRequestingEcoCounterError(response.content.decode())
+        raise FailedRequestingEcoCounterError(response.content.decode() + f'\nAttempted URL={url}')
     return _build_count_history(_check_response_content(response.json()))
 
 
