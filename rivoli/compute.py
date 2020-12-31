@@ -423,8 +423,8 @@ def build_tweet(day: date, count_history: CountHistory, publish_date: date) -> T
 
 
 # TODO: tests e2e
-# TODO: Procfile
 # TODO: requirements.txt
+# TODO: Procfile + heroku deploy
 # TODO: fetch_data template
 # TODO: Readme.md
 # TODO: docstring
