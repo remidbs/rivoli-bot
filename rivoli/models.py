@@ -72,3 +72,12 @@ class Tweet:
     def __post_init__(self):
         if len(self.content) > 280:
             raise ValueError('Tweet content must contain less than 280 characters.')
+
+
+@dataclass
+class Hashtag:
+    content: str
+
+    def __post_init__(self):
+        if not self.content or self.content[0] != '#':
+            raise ValueError(f'Expecting hastag to start with char #. Received {self.content}')

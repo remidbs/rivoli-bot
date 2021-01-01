@@ -1,6 +1,8 @@
 import json
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Union
+
+import requests
 
 
 def parse_mdy(str_: str) -> date:
@@ -75,3 +77,20 @@ def check_str(var: Any) -> str:
     if not isinstance(var, str):
         raise ValueError(f'Expecting str, got {type(var)}')
     return var
+
+
+def _get_value(element) -> str:
+    return element.value
+
+
+def get_enum_choices(enum) -> List[str]:
+    return list(map(_get_value, list(enum)))
+
+
+def post_to_slack(url: str, text: str) -> None:
+    response = requests.post(url, data=json.dumps({'text': text}))
+    if 200 <= response.status_code < 300:
+        return
+    raise ValueError(
+        f'Failed posting to slack: status_code={response.status_code}, content={response.content.decode()}'
+    )

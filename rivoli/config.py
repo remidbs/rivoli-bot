@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from rivoli.models import Hashtag
 from rivoli.params import (
     RIVOLI_BOT_SLACK,
     RIVOLI_TWITTER_ACCESS_TOKEN,
@@ -42,18 +43,13 @@ class SlackSettings:
 class Settings:
     twitter: Optional[TwitterSettings]
     slack: Optional[SlackSettings]
+    hashtag: Optional[Hashtag]
     counter_id: str
 
 
 class CounterName(Enum):
     RIVOLI = 'RIVOLI'
     SEBASTOPOL = 'SEBASTOPOL'
-
-
-_ECO_COUNTER_ID = {
-    CounterName.RIVOLI: '100154889',
-    CounterName.SEBASTOPOL: '100158705',
-}
 
 
 def get_settings(counter: CounterName) -> Settings:
@@ -66,7 +62,8 @@ def get_settings(counter: CounterName) -> Settings:
                 RIVOLI_TWITTER_ACCESS_TOKEN_SECRET,
             ),
             SlackSettings(RIVOLI_BOT_SLACK),
-            _ECO_COUNTER_ID[counter],
+            Hashtag('#CompteurRivoli'),
+            '100154889',
         )
     if counter == CounterName.SEBASTOPOL:
         return Settings(
@@ -77,6 +74,7 @@ def get_settings(counter: CounterName) -> Settings:
                 SEBASTOPOL_TWITTER_ACCESS_TOKEN_SECRET,
             ),
             SlackSettings(RIVOLI_BOT_SLACK),
-            _ECO_COUNTER_ID[counter],
+            Hashtag('#CompteurSebastopol'),
+            '100158705',
         )
     raise NotImplementedError(f'Counter {counter} has no settings.')

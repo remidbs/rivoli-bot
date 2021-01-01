@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from math import ceil
 from typing import Callable, Dict, Iterable, List, Optional, Union
 
-from rivoli.models import CountHistory, Month, Tweet
+from rivoli.models import CountHistory, Hashtag, Month, Tweet
 from rivoli.utils import date_to_dmy, month_to_french_word
 
 
@@ -225,7 +225,7 @@ class YearSummaryEvent:
 
     @staticmethod
     def default_score() -> float:
-        return 0.95
+        return 0.96
 
     def default_message(self) -> str:
         french_ordinal = _build_french_ordinal(self.year_rank)
@@ -417,14 +417,15 @@ def _event_to_fact(event: Event) -> str:
     return event.default_message()
 
 
-def build_tweet(day: date, count_history: CountHistory, publish_date: date) -> Tweet:
+def build_tweet(day: date, count_history: CountHistory, publish_date: date, hashtag: Optional[Hashtag]) -> Tweet:
     event = _compute_most_interesting_fact(day, count_history)
-    return Tweet(' '.join([_compute_first_half_of_tweet(day, count_history, publish_date), _event_to_fact(event)]))
+    tweet_lines = [_compute_first_half_of_tweet(day, count_history, publish_date), _event_to_fact(event)]
+    if hashtag:
+        tweet_lines.append(hashtag.content)
+    return Tweet('\n'.join(tweet_lines))
 
 
 # TODO: tests e2e
-# TODO: requirements.txt
-# TODO: Procfile + heroku deploy
 # TODO: fetch_data template
 # TODO: Readme.md
 # TODO: docstring
