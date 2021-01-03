@@ -315,11 +315,11 @@ def test_default_message():
     expected = '2010 : 11ème meilleure année de l\'histoire avec 15000 passages.'
     assert YearSummaryEvent(2010, 15000, 10).default_message() == expected
 
-    assert YearTotalEvent(15000).default_message() == '15000 passages depuis le début de l\'année.'
-    assert YearTotalEvent(34003).default_message() == '34003 passages depuis le début de l\'année.'
+    assert YearTotalEvent(15000, date.today()).default_message() == '15000 passages depuis le début de l\'année.'
+    assert YearTotalEvent(34003, date.today()).default_message() == '34003 passages depuis le début de l\'année.'
 
-    assert MonthTotalEvent(15000).default_message() == '15000 passages depuis le début du mois.'
-    assert MonthTotalEvent(34003).default_message() == '34003 passages depuis le début du mois.'
+    assert MonthTotalEvent(15000, date.today()).default_message() == '15000 passages depuis le début du mois.'
+    assert MonthTotalEvent(34003, date.today()).default_message() == '34003 passages depuis le début du mois.'
 
     assert HistoricalTotalEvent(15000).default_message() == '15000 passages depuis l\'installation du compteur.'
     assert HistoricalTotalEvent(34003).default_message() == '34003 passages depuis l\'installation du compteur.'

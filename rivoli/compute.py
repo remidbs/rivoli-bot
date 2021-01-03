@@ -235,8 +235,13 @@ class YearSummaryEvent:
 @dataclass
 class YearTotalEvent:
     year_total: int
+    day: date
 
     def default_score(self) -> float:
+        if self.day.day == 1:
+            return 0
+        if self.day.day <= 4:
+            return 0.4
         if _number_is_funny(self.year_total):
             return 0.75
         return 0.5
@@ -248,10 +253,15 @@ class YearTotalEvent:
 @dataclass
 class MonthTotalEvent:
     month_total: int
+    day: date
 
     def default_score(self) -> float:
+        if self.day.day == 1:
+            return 0
         if _number_is_funny(self.month_total):
             return 0.75
+        if self.day.day <= 4:
+            return 0.4
         return 0.5
 
     def default_message(self) -> str:
@@ -342,13 +352,13 @@ def _extract_total_count_event(day: date, count_history: CountHistory) -> Histor
 def _extract_month_total_count_event(day: date, count_history: CountHistory) -> MonthTotalEvent:
     month_to_count = _get_month_to_count(count_history)
     month = _get_month(day)
-    return MonthTotalEvent(month_to_count[month])
+    return MonthTotalEvent(month_to_count[month], day)
 
 
 def _extract_year_total_count_event(day: date, count_history: CountHistory) -> YearTotalEvent:
     year_to_count = _get_year_to_count(count_history)
     year = day.year
-    return YearTotalEvent(year_to_count[year])
+    return YearTotalEvent(year_to_count[year], day)
 
 
 _EVENT_COMPUTERS: List[EventComputer] = [
