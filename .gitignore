@@ -1,5 +1,6 @@
 rivoli/secrets.py
 rivoli/mock_answer.json
+rivoli/todo.txt
 .vscode/*
 .mypy_cache/*
 *__pycache__*

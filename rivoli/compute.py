@@ -455,13 +455,3 @@ def build_tweet(day: date, count_history: CountHistory, publish_date: date, hash
     if hashtag:
         tweet_lines.append(hashtag.content)
     return Tweet('\n'.join(tweet_lines))
-
-
-# TODO: Merge
-# TODO: License
-# TODO: fetch_data template
-# TODO: Readme.md
-# TODO: docstring
-# TODO: precommit: pytest and pytest --mypy-ignore-missing-imports rivoli
-# TODO: github cicd for tests
-# TODO: Week Rank, rank in week, ... invite contributions

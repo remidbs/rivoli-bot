@@ -25,9 +25,7 @@ def _ensure_dict(obj: Any) -> Dict[str, Any]:
 
 
 def _load_count_history(input_filename: str) -> CountHistory:
-    if '.csv' in input_filename:
-        return CountHistory.from_csv(load_file(input_filename))
-    return CountHistory.from_json(_ensure_dict(load_json(input_filename)))
+    return CountHistory.from_csv(load_file(input_filename))
 
 
 def _raise_if_error(response):
@@ -97,7 +95,7 @@ def _get_hashtag(counter_name: Optional[str]) -> Optional[Hashtag]:
 
 def _build_handler(args: argparse.Namespace) -> Handler:
     output = Output(args.output)
-    counter = CounterName(args.counter)
+    counter = CounterName(args.counter) if args.counter else None
     if output == Output.STD:
         return StdOutHandler()
     if output == Output.SLACK:
