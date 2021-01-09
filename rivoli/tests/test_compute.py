@@ -1,4 +1,5 @@
 import os
+import random
 from datetime import date, timedelta
 
 import pytest
@@ -15,6 +16,7 @@ from rivoli.compute import (
     _capitalize_first_letter,
     _compute_day_expression,
     _compute_first_half_of_tweet,
+    _crosses_power_of_ten,
     _cumulate,
     _day_is_absolute_maximum,
     _day_is_first_day_of_month,
@@ -28,16 +30,18 @@ from rivoli.compute import (
     _get_month_range,
     _group_by_month,
     _group_by_year,
+    _increments_first_digit,
     _month_to_cumulate_sums,
     _month_to_french,
     _number_is_funny,
     _optimistic_rank,
     _round_to_twentieth,
     _safe_get_count,
+    build_tweet,
     day_is_today,
     day_is_yesterday,
 )
-from rivoli.models import CountHistory, DayCount, Month
+from rivoli.models import CountHistory, DayCount, Hashtag, Month
 from rivoli.utils import parse_ymd
 
 
@@ -288,7 +292,7 @@ def test_build_french_ordinal():
 def test_default_message():
     assert MonthRecordEvent(date.today()).default_message() == 'Record du mois !'
 
-    assert HistoricalRecordEvent().default_message() == 'Record historique !'
+    assert HistoricalRecordEvent(100).default_message() == 'Record historique !'
 
     assert DayHistoricalRankEvent(0, 100).default_message() == 'Meilleur jour historique.'
     assert DayHistoricalRankEvent(50, 100).default_message() == 'Top 55%.'
@@ -315,14 +319,14 @@ def test_default_message():
     expected = '2010 : 11ème meilleure année de l\'histoire avec 15000 passages.'
     assert YearSummaryEvent(2010, 15000, 10).default_message() == expected
 
-    assert YearTotalEvent(15000, date.today()).default_message() == '15000 passages depuis le début de l\'année.'
-    assert YearTotalEvent(34003, date.today()).default_message() == '34003 passages depuis le début de l\'année.'
+    assert YearTotalEvent(15000, date.today(), 10).default_message() == '15000 passages depuis le début de l\'année.'
+    assert YearTotalEvent(34003, date.today(), 10).default_message() == '34003 passages depuis le début de l\'année.'
 
-    assert MonthTotalEvent(15000, date.today()).default_message() == '15000 passages depuis le début du mois.'
-    assert MonthTotalEvent(34003, date.today()).default_message() == '34003 passages depuis le début du mois.'
+    assert MonthTotalEvent(15000, date.today(), 10).default_message() == '15000 passages depuis le début du mois.'
+    assert MonthTotalEvent(34003, date.today(), 10).default_message() == '34003 passages depuis le début du mois.'
 
-    assert HistoricalTotalEvent(15000).default_message() == '15000 passages depuis l\'installation du compteur.'
-    assert HistoricalTotalEvent(34003).default_message() == '34003 passages depuis l\'installation du compteur.'
+    assert HistoricalTotalEvent(15000, 10).default_message() == '15000 passages depuis l\'installation du compteur.'
+    assert HistoricalTotalEvent(34003, 10).default_message() == '34003 passages depuis l\'installation du compteur.'
 
 
 def test_capitalize_first_letter():
@@ -331,3 +335,66 @@ def test_capitalize_first_letter():
     assert _capitalize_first_letter('Foo') == 'Foo'
     assert _capitalize_first_letter('bar') == 'Bar'
     assert _capitalize_first_letter('') == ''
+
+
+def test_crosses_power_of_ten():
+    assert _crosses_power_of_ten(1, 10000)
+    assert _crosses_power_of_ten(10, 100)
+    assert _crosses_power_of_ten(3, 1000)
+    assert _crosses_power_of_ten(19, 1000)
+    assert not _crosses_power_of_ten(19, 90)
+    assert not _crosses_power_of_ten(1932, 9009)
+    assert not _crosses_power_of_ten(1932, 900)
+
+
+def test_increments_first_digit():
+    assert _increments_first_digit(100000, 200000)
+    assert _increments_first_digit(1234324, 3233235)
+    assert _increments_first_digit(1, 2)
+    assert not _increments_first_digit(2, 2)
+    assert not _increments_first_digit(210, 244)
+    assert not _increments_first_digit(210, 299)
+
+
+def test_end_to_end():
+    test_counter = _get_rivoli_test_count_history()
+
+    day = date(2020, 1, 8)
+    expected_tweet = 'Hier, il y a eu 8812 cyclistes.\n7ème meilleur jour historique.\n#CompteurRivoli'
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    day = date(2020, 1, 16)
+    expected_tweet = 'Hier, il y a eu 9008 cyclistes.\n6ème meilleur jour historique.\n#CompteurRivoli'
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    random.seed(1)
+    day = date(2020, 1, 23)
+    expected_tweet = 'Hier, il y a eu 6248 cyclistes.\nTop 25%.\n#CompteurRivoli'
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    day = date(2020, 1, 31)
+    expected_tweet = (
+        "Hier, il y a eu 6206 cyclistes.\nJanvier 2020 : meilleur mois de "
+        "l'histoire avec 202368 passages.\n#CompteurRivoli"
+    )
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    random.seed(42)
+    day = date(2020, 10, 10)
+    expected_tweet = 'Hier, il y a eu 9545 cyclistes.\nTop 20%.\n#CompteurRivoli'
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    day = date(2020, 10, 11)
+    expected_tweet = 'Hier, il y a eu 6904 cyclistes.\n88888 passages depuis le début du mois.\n#CompteurRivoli'
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    day = date(2020, 10, 26)
+    expected_tweet = 'Hier, il y a eu 7673 cyclistes.\n206544 passages depuis le début du mois.\n#CompteurRivoli'
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+    day = date(2020, 10, 31)
+    expected_tweet = (
+        "Hier, il y a eu 2084 cyclistes.\nOctobre 2020 : 4ème meilleur mois de "
+        "l'histoire avec 236104 passages.\n#CompteurRivoli"
+    )
+    assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
