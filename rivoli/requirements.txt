@@ -1,3 +1,0 @@
-numpy==1.16.0
-requests==2.21.0
-tweepy==3.8.0
