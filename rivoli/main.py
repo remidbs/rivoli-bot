@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from rivoli.config import CounterName, get_settings
 from rivoli.fetch_data import fetch_and_dump_data
-from rivoli.tweet import Handler, SlackHandler, StdOutHandler, load_data_and_dispatch_tweet
+from rivoli.tweet import Handler, SlackHandler, StdOutHandler, TwitterHandler, load_data_and_dispatch_tweet
 from rivoli.utils import get_enum_choices
 
 
@@ -27,6 +27,14 @@ def fetch_data_and_post_tweet_to_slack(counter_name: CounterName) -> None:
     if not settings.slack:
         raise ValueError('Expecting slack url to be defined.')
     handler = SlackHandler(settings.slack)
+    _fetch_data_and_post_tweet(counter_name, handler)
+
+
+def fetch_data_and_publish_tweet(counter_name: CounterName) -> None:
+    settings = get_settings(counter_name)
+    if not settings.twitter:
+        raise ValueError('Expecting twitter settings to be defined.')
+    handler = TwitterHandler(settings.twitter)
     _fetch_data_and_post_tweet(counter_name, handler)
 
 
