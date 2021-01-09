@@ -129,8 +129,11 @@ def _get_month_range(month: Month) -> int:
 
 @dataclass
 class HistoricalRecordEvent:
-    @staticmethod
-    def default_score() -> float:
+    elapsed_days: int
+
+    def default_score(self) -> float:
+        if self.elapsed_days <= 10:
+            return 0.0
         return 1.0
 
     @staticmethod
@@ -232,16 +235,27 @@ class YearSummaryEvent:
         return f'{self.year} : {french_ordinal}meilleure année de l\'histoire avec {self.year_count} passages.'
 
 
+def _crosses_power_of_ten(number_before: int, number_after: int) -> bool:
+    return len(str(number_after)) > len(str(number_before))
+
+
+def _increments_first_digit(number_before: int, number_after: int) -> bool:
+    return int(str(number_after)[0]) > int(str(number_before)[0])
+
+
 @dataclass
 class YearTotalEvent:
     year_total: int
     day: date
+    day_count: int
 
     def default_score(self) -> float:
-        if self.day.day == 1:
-            return 0
-        if self.day.day <= 4:
-            return 0.4
+        if self.day.month == 1:
+            return 0  # priority to month record in january
+        if _crosses_power_of_ten(self.year_total - self.day_count, self.year_total):
+            return 0.95
+        if _increments_first_digit(self.year_total - self.day_count, self.year_total):
+            return 0.85
         if _number_is_funny(self.year_total):
             return 0.75
         return 0.5
@@ -254,14 +268,19 @@ class YearTotalEvent:
 class MonthTotalEvent:
     month_total: int
     day: date
+    day_count: int
 
     def default_score(self) -> float:
         if self.day.day == 1:
             return 0
         if _number_is_funny(self.month_total):
-            return 0.75
-        if self.day.day <= 4:
-            return 0.4
+            return 0.74
+        if self.day.day <= 20:
+            return 0.5
+        if _crosses_power_of_ten(self.month_total - self.day_count, self.month_total):
+            return 0.94
+        if _increments_first_digit(self.month_total - self.day_count, self.month_total):
+            return 0.84
         return 0.5
 
     def default_message(self) -> str:
@@ -271,8 +290,13 @@ class MonthTotalEvent:
 @dataclass
 class HistoricalTotalEvent:
     historical_total: int
+    day_count: int
 
     def default_score(self) -> float:
+        if _crosses_power_of_ten(self.historical_total - self.day_count, self.historical_total):
+            return 0.94
+        if _increments_first_digit(self.historical_total - self.day_count, self.historical_total):
+            return 0.84
         if _number_is_funny(self.historical_total):
             return 0.75
         return 0.5
@@ -319,10 +343,10 @@ def _extract_year_event(day: date, count_history: CountHistory) -> YearSummaryEv
 EventComputer = Callable[[date, CountHistory], Optional[Event]]
 
 
-# EVENT COMPUTERS TODO: MOVE
 def _historical_record(day: date, count_history: CountHistory) -> Optional[HistoricalRecordEvent]:
     if _day_is_absolute_maximum(day, count_history):
-        return HistoricalRecordEvent()
+        elapsed_days_since_beginning = (day - count_history.daily_counts[0].date).days
+        return HistoricalRecordEvent(elapsed_days_since_beginning)
     return None
 
 
@@ -344,21 +368,20 @@ def _get_year_summary(day: date, count_history: CountHistory) -> Optional[YearSu
 
 
 def _extract_total_count_event(day: date, count_history: CountHistory) -> HistoricalTotalEvent:
-    del day  # hack for linter
     total = sum(count_history.day_to_count.values())
-    return HistoricalTotalEvent(total)
+    return HistoricalTotalEvent(total, count_history.day_to_count[day])
 
 
 def _extract_month_total_count_event(day: date, count_history: CountHistory) -> MonthTotalEvent:
     month_to_count = _get_month_to_count(count_history)
     month = _get_month(day)
-    return MonthTotalEvent(month_to_count[month], day)
+    return MonthTotalEvent(month_to_count[month], day, count_history.day_to_count[day])
 
 
 def _extract_year_total_count_event(day: date, count_history: CountHistory) -> YearTotalEvent:
     year_to_count = _get_year_to_count(count_history)
     year = day.year
-    return YearTotalEvent(year_to_count[year], day)
+    return YearTotalEvent(year_to_count[year], day, count_history.day_to_count[day])
 
 
 _EVENT_COMPUTERS: List[EventComputer] = [
@@ -372,7 +395,6 @@ _EVENT_COMPUTERS: List[EventComputer] = [
 ]
 
 
-# TODO: Week Rank, rank in week, ...
 def _extract_counting_events(
     day: date, count_history: CountHistory, event_computers: List[EventComputer]
 ) -> List[Event]:
@@ -435,9 +457,11 @@ def build_tweet(day: date, count_history: CountHistory, publish_date: date, hash
     return Tweet('\n'.join(tweet_lines))
 
 
-# TODO: tests e2e
+# TODO: Merge
+# TODO: License
 # TODO: fetch_data template
 # TODO: Readme.md
 # TODO: docstring
-# TODO: precommit
+# TODO: precommit: pytest and pytest --mypy-ignore-missing-imports rivoli
 # TODO: github cicd for tests
+# TODO: Week Rank, rank in week, ... invite contributions
