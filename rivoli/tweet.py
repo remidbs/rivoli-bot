@@ -5,11 +5,13 @@ from datetime import date
 from enum import Enum
 from typing import Any, Dict, Optional, Union
 
+from tweepy.models import Status
+
 from rivoli.compute import build_tweet
 from rivoli.config import CounterName, SlackSettings, TwitterSettings, get_settings
 from rivoli.models import CountHistory, Hashtag, Tweet
 from rivoli.twitter import get_tweepy_api
-from rivoli.utils import get_enum_choices, load_file, load_json, parse_dmy, post_to_slack
+from rivoli.utils import get_enum_choices, load_file, parse_dmy, post_to_slack
 
 
 class Output(Enum):
@@ -28,8 +30,9 @@ def _load_count_history(input_filename: str) -> CountHistory:
     return CountHistory.from_csv(load_file(input_filename))
 
 
-def _raise_if_error(response):
-    raise NotImplementedError(f'{type(response)}')
+def _raise_if_error(response: Any) -> None:
+    if not isinstance(response, Status):
+        raise ValueError(f'Unexpected response type {type(response)}. str(response) = {str(response)}')
 
 
 @dataclass
