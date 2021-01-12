@@ -1,4 +1,6 @@
+import random
 import traceback
+from datetime import date
 from typing import Any, Callable, List
 
 import pytz
@@ -13,6 +15,7 @@ SCHED = BlockingScheduler()
 
 
 def _post_exceptions_to_slack(func: Callable, args: List[Any]):
+    random.seed(date.today().day)  # ensure posted tweet is the one that was inspected
     try:
         func(*args)
         success_message = f'Succesfully executed func {func} with args {args}'
@@ -32,12 +35,12 @@ def sebastopol_post_to_slack():
     _post_exceptions_to_slack(fetch_data_and_post_tweet_to_slack, [CounterName.SEBASTOPOL])
 
 
-@SCHED.scheduled_job('cron', hour=11, minute=0, timezone=pytz.timezone('Europe/Paris'))
+@SCHED.scheduled_job('cron', hour=9, minute=30, timezone=pytz.timezone('Europe/Paris'))
 def rivoli_tweet():
     _post_exceptions_to_slack(fetch_data_and_publish_tweet, [CounterName.RIVOLI])
 
 
-@SCHED.scheduled_job('cron', hour=11, minute=0, timezone=pytz.timezone('Europe/Paris'))
+@SCHED.scheduled_job('cron', hour=9, minute=30, timezone=pytz.timezone('Europe/Paris'))
 def sebastopol_tweet():
     _post_exceptions_to_slack(fetch_data_and_publish_tweet, [CounterName.SEBASTOPOL])
 
