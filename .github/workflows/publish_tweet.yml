@@ -1,0 +1,39 @@
+# name: Publish tweet
+
+# on:
+#   schedule:
+#     # <minute [0,59]> <hour [0,23]> <day of the month [1,31]> <month of the year [1,12]> <day of the week [0,6]>
+#     # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07
+#     # Run everyday at 05:00:00 UTC
+#     - cron: "30 7 * * *"
+
+# jobs:
+#   publish_tweet:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - uses: actions/checkout@v1
+#       - name: Set up Python
+#         uses: actions/setup-python@v1
+#         with:
+#           python-version: 3.7
+#       - name: Install Dependencies
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install requirements.txt
+#       - name: Compute and publish tweet
+#         env:
+#           RIVOLI_BOT_SLACK: ${{ secrets.RIVOLI_BOT_SLACK }}
+#           RIVOLI_TWITTER_ACCESS_TOKEN: ${{ secrets.RIVOLI_TWITTER_ACCESS_TOKEN }}
+#           RIVOLI_TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.RIVOLI_TWITTER_ACCESS_TOKEN_SECRET }}
+#           RIVOLI_TWITTER_CUSTOMER_API_KEY: ${{ secrets.RIVOLI_TWITTER_CUSTOMER_API_KEY }}
+#           RIVOLI_TWITTER_CUSTOMER_API_SECRET_KEY: ${{ secrets.RIVOLI_TWITTER_CUSTOMER_API_SECRET_KEY }}
+#           SEBASTOPOL_TWITTER_ACCESS_TOKEN: ${{ secrets.SEBASTOPOL_TWITTER_ACCESS_TOKEN }}
+#           SEBASTOPOL_TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.SEBASTOPOL_TWITTER_ACCESS_TOKEN_SECRET }}
+#           SEBASTOPOL_TWITTER_CUSTOMER_API_KEY: ${{ secrets.SEBASTOPOL_TWITTER_CUSTOMER_API_KEY }}
+#           SEBASTOPOL_TWITTER_CUSTOMER_API_SECRET_KEY: ${{ secrets.SEBASTOPOL_TWITTER_CUSTOMER_API_SECRET_KEY }}
+#           SEBASTOPOL_URL: ${{ secrets.SEBASTOPOL_URL }}
+#           RIVOLI_URL: ${{ secrets.RIVOLI_URL }}
+#           PYTHONPATH: "."
+#         run: |
+#           python3 rivoli/entry_points/publish_tweet.py
