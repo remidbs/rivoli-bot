@@ -10,12 +10,13 @@ from rivoli.utils import post_to_slack
 
 def execute_and_publish_output(func: Callable, args: List[Any]):
     args_str = ", ".join(map(str, args))
+    func_name = func.__name__
     try:
         func(*args)
-        success_message = f'Succesfully executed {func}({args_str})'
+        success_message = f'Succesfully executed {func_name}({args_str})'
         post_to_slack(RIVOLI_BOT_SLACK, success_message)
     except Exception:  # pylint: disable=broad-except
-        message = '\n'.join([f'Failed executing function {func}({args_str})', traceback.format_exc()])
+        message = '\n'.join([f'Failed executing function {func_name}({args_str})', traceback.format_exc()])
         post_to_slack(RIVOLI_BOT_SLACK, message)
 
 
