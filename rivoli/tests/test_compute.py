@@ -3,6 +3,7 @@ import random
 from datetime import date, timedelta
 
 import pytest
+
 from rivoli.compute import (
     DayHistoricalRankEvent,
     HistoricalRecordEvent,
@@ -35,6 +36,7 @@ from rivoli.compute import (
     _month_to_french,
     _number_is_funny,
     _optimistic_rank,
+    _prettify_number,
     _round_to_twentieth,
     _safe_get_count,
     build_tweet,
@@ -252,16 +254,16 @@ def test_compute_day_expression():
 
 def test_compute_first_half_of_tweet():
     count_history = _get_small_count_history()
-    expected = 'Le 31/08/2020, il y a eu 100 cyclistes.'
+    expected = 'Le 31/08/2020, il y a eu 100 passages de cyclistes.'
     assert count_history.daily_counts[0].date == date(2020, 8, 31)
     assert _compute_first_half_of_tweet(count_history.daily_counts[0].date, count_history, date.today()) == expected
-    expected = 'Aujourd\'hui, il y a eu 100 cyclistes.'
+    expected = 'Aujourd\'hui, il y a eu 100 passages de cyclistes.'
     assert (
         _compute_first_half_of_tweet(count_history.daily_counts[0].date, count_history, date(2020, 8, 31)) == expected
     )
-    expected = 'Hier, il y a eu 100 cyclistes.'
+    expected = 'Hier, il y a eu 100 passages de cyclistes.'
     assert _compute_first_half_of_tweet(count_history.daily_counts[0].date, count_history, date(2020, 9, 1)) == expected
-    expected = 'Hier, il y a eu 120 cyclistes.'
+    expected = 'Hier, il y a eu 120 passages de cyclistes.'
     assert (
         _compute_first_half_of_tweet(count_history.daily_counts[-1].date, count_history, date(2020, 9, 6)) == expected
     )
@@ -301,32 +303,32 @@ def test_default_message():
     assert DayHistoricalRankEvent(4, 100).default_message() == '5ème meilleur jour historique.'
     assert DayHistoricalRankEvent(140, 159).default_message() == 'Top 90%.'
 
-    expected = 'Février 2020 : 5ème meilleur mois de l\'histoire avec 14000 passages.'
+    expected = 'Février 2020 : 5ème meilleur mois de l\'histoire avec 14 000 passages.'
     assert MonthSummaryEvent(Month(2, 2020), 14000, 4).default_message() == expected
-    expected = 'Février 2020 : meilleur mois de l\'histoire avec 14000 passages.'
+    expected = 'Février 2020 : meilleur mois de l\'histoire avec 14 000 passages.'
     assert MonthSummaryEvent(Month(2, 2020), 14000, 0).default_message() == expected
-    expected = 'Mars 2010 : meilleur mois de l\'histoire avec 15000 passages.'
+    expected = 'Mars 2010 : meilleur mois de l\'histoire avec 15 000 passages.'
     assert MonthSummaryEvent(Month(3, 2010), 15000, 0).default_message() == expected
-    expected = 'Mars 2010 : 11ème meilleur mois de l\'histoire avec 15000 passages.'
+    expected = 'Mars 2010 : 11ème meilleur mois de l\'histoire avec 15 000 passages.'
     assert MonthSummaryEvent(Month(3, 2010), 15000, 10).default_message() == expected
 
-    expected = '2020 : 5ème meilleure année de l\'histoire avec 14000 passages.'
+    expected = '2020 : 5ème meilleure année de l\'histoire avec 14 000 passages.'
     assert YearSummaryEvent(2020, 14000, 4).default_message() == expected
-    expected = '2020 : meilleure année de l\'histoire avec 14000 passages.'
+    expected = '2020 : meilleure année de l\'histoire avec 14 000 passages.'
     assert YearSummaryEvent(2020, 14000, 0).default_message() == expected
-    expected = '2010 : meilleure année de l\'histoire avec 15000 passages.'
+    expected = '2010 : meilleure année de l\'histoire avec 15 000 passages.'
     assert YearSummaryEvent(2010, 15000, 0).default_message() == expected
-    expected = '2010 : 11ème meilleure année de l\'histoire avec 15000 passages.'
+    expected = '2010 : 11ème meilleure année de l\'histoire avec 15 000 passages.'
     assert YearSummaryEvent(2010, 15000, 10).default_message() == expected
 
-    assert YearTotalEvent(15000, date.today(), 10).default_message() == '15000 passages depuis le début de l\'année.'
-    assert YearTotalEvent(34003, date.today(), 10).default_message() == '34003 passages depuis le début de l\'année.'
+    assert YearTotalEvent(15000, date.today(), 10).default_message() == '15 000 passages depuis le début de l\'année.'
+    assert YearTotalEvent(34003, date.today(), 10).default_message() == '34 003 passages depuis le début de l\'année.'
 
-    assert MonthTotalEvent(15000, date.today(), 10).default_message() == '15000 passages depuis le début du mois.'
-    assert MonthTotalEvent(34003, date.today(), 10).default_message() == '34003 passages depuis le début du mois.'
+    assert MonthTotalEvent(15000, date.today(), 10).default_message() == '15 000 passages depuis le début du mois.'
+    assert MonthTotalEvent(34003, date.today(), 10).default_message() == '34 003 passages depuis le début du mois.'
 
-    assert HistoricalTotalEvent(15000, 10).default_message() == '15000 passages depuis l\'installation du compteur.'
-    assert HistoricalTotalEvent(34003, 10).default_message() == '34003 passages depuis l\'installation du compteur.'
+    assert HistoricalTotalEvent(15000, 10).default_message() == '15 000 passages depuis l\'installation du compteur.'
+    assert HistoricalTotalEvent(34003, 10).default_message() == '34 003 passages depuis l\'installation du compteur.'
 
 
 def test_capitalize_first_letter():
@@ -360,41 +362,53 @@ def test_end_to_end():
     test_counter = _get_rivoli_test_count_history()
 
     day = date(2020, 1, 8)
-    expected_tweet = 'Hier, il y a eu 8812 cyclistes.\n7ème meilleur jour historique.\n#CompteurRivoli'
+    expected_tweet = 'Hier, il y a eu 8 812 passages de cyclistes.\n7ème meilleur jour historique.\n#CompteurRivoli'
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     day = date(2020, 1, 16)
-    expected_tweet = 'Hier, il y a eu 9008 cyclistes.\n6ème meilleur jour historique.\n#CompteurRivoli'
+    expected_tweet = 'Hier, il y a eu 9 008 passages de cyclistes.\n6ème meilleur jour historique.\n#CompteurRivoli'
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     random.seed(1)
     day = date(2020, 1, 23)
-    expected_tweet = 'Hier, il y a eu 6248 cyclistes.\nTop 25%.\n#CompteurRivoli'
+    expected_tweet = 'Hier, il y a eu 6 248 passages de cyclistes.\nTop 25%.\n#CompteurRivoli'
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     day = date(2020, 1, 31)
     expected_tweet = (
-        "Hier, il y a eu 6206 cyclistes.\nJanvier 2020 : meilleur mois de "
-        "l'histoire avec 202368 passages.\n#CompteurRivoli"
+        "Hier, il y a eu 6 206 passages de cyclistes.\nJanvier 2020 : meilleur mois de "
+        "l'histoire avec 202 368 passages.\n#CompteurRivoli"
     )
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     random.seed(42)
     day = date(2020, 10, 10)
-    expected_tweet = 'Hier, il y a eu 9545 cyclistes.\nTop 20%.\n#CompteurRivoli'
+    expected_tweet = 'Hier, il y a eu 9 545 passages de cyclistes.\nTop 20%.\n#CompteurRivoli'
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     day = date(2020, 10, 11)
-    expected_tweet = 'Hier, il y a eu 6904 cyclistes.\n88888 passages depuis le début du mois.\n#CompteurRivoli'
+    expected_tweet = (
+        'Hier, il y a eu 6 904 passages de cyclistes.\n88 888 passages depuis le début du mois.\n#CompteurRivoli'
+    )
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     day = date(2020, 10, 26)
-    expected_tweet = 'Hier, il y a eu 7673 cyclistes.\n206544 passages depuis le début du mois.\n#CompteurRivoli'
+    expected_tweet = (
+        'Hier, il y a eu 7 673 passages de cyclistes.\n206 544 passages depuis le début du mois.\n#CompteurRivoli'
+    )
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
 
     day = date(2020, 10, 31)
     expected_tweet = (
-        "Hier, il y a eu 2084 cyclistes.\nOctobre 2020 : 4ème meilleur mois de "
-        "l'histoire avec 236104 passages.\n#CompteurRivoli"
+        "Hier, il y a eu 2 084 passages de cyclistes.\nOctobre 2020 : 4ème meilleur mois de "
+        "l'histoire avec 236 104 passages.\n#CompteurRivoli"
     )
     assert build_tweet(day, test_counter, day + timedelta(days=1), Hashtag('#CompteurRivoli')).content == expected_tweet
+
+
+def test_prettify_number():
+    assert _prettify_number(1) == '1'
+    assert _prettify_number(13) == '13'
+    assert _prettify_number(123) == '123'
+    assert _prettify_number(1234) == '1 234'
+    assert _prettify_number(123456789) == '123 456 789'

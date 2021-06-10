@@ -17,7 +17,7 @@ python3 rivoli/tweet.py -i rivoli/tests/test_data/rivoli_test_data.csv -d random
 ### Example output
 
 ```
-Le 07/12/2019, il y a eu 6896 cyclistes.
+Le 07/12/2019, il y a eu 6 896 passages de cyclistes.
 4ème meilleur jour historique.
 ```
 

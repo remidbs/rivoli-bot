@@ -1,3 +1,4 @@
+import math
 import random
 from calendar import monthrange
 from dataclasses import dataclass
@@ -217,7 +218,7 @@ class MonthSummaryEvent:
     def default_message(self) -> str:
         month_name = _month_to_french(self.month)
         french_ordinal = _build_french_ordinal(self.month_rank)
-        return f'{month_name} : {french_ordinal}meilleur mois de l\'histoire avec {self.month_count} passages.'
+        return f'{month_name} : {french_ordinal}meilleur mois de l\'histoire avec {_prettify_number(self.month_count)} passages.'
 
 
 @dataclass
@@ -232,7 +233,7 @@ class YearSummaryEvent:
 
     def default_message(self) -> str:
         french_ordinal = _build_french_ordinal(self.year_rank)
-        return f'{self.year} : {french_ordinal}meilleure année de l\'histoire avec {self.year_count} passages.'
+        return f'{self.year} : {french_ordinal}meilleure année de l\'histoire avec {_prettify_number(self.year_count)} passages.'
 
 
 def _crosses_power_of_ten(number_before: int, number_after: int) -> bool:
@@ -261,7 +262,7 @@ class YearTotalEvent:
         return 0.5
 
     def default_message(self) -> str:
-        return f'{self.year_total} passages depuis le début de l\'année.'
+        return f'{_prettify_number(self.year_total)} passages depuis le début de l\'année.'
 
 
 @dataclass
@@ -284,7 +285,7 @@ class MonthTotalEvent:
         return 0.5
 
     def default_message(self) -> str:
-        return f'{self.month_total} passages depuis le début du mois.'
+        return f'{_prettify_number(self.month_total)} passages depuis le début du mois.'
 
 
 @dataclass
@@ -302,7 +303,7 @@ class HistoricalTotalEvent:
         return 0.5
 
     def default_message(self) -> str:
-        return f'{self.historical_total} passages depuis l\'installation du compteur.'
+        return f'{_prettify_number(self.historical_total)} passages depuis l\'installation du compteur.'
 
 
 Event = Union[
@@ -439,10 +440,23 @@ def _compute_day_expression(day: date, publish_date: date) -> str:
     return f'Le {date_str}'
 
 
+def _prettify_number(number: int) -> str:
+    str_number = str(number)
+    batch_size = 3
+    return ' '.join(
+        [
+            str_number[
+                max(0, len(str_number) - batch_size * (batch_index + 1)) : len(str_number) - batch_size * batch_index
+            ]
+            for batch_index in range(math.ceil(len(str_number) / batch_size))
+        ][::-1]
+    )
+
+
 def _compute_first_half_of_tweet(day: date, count_history: CountHistory, publish_date: date) -> str:
     day_expression = _compute_day_expression(day, publish_date)
     nb_occurrences_this_day = _safe_get_count(day, count_history)
-    return f'{day_expression}, il y a eu {nb_occurrences_this_day} cyclistes.'
+    return f'{day_expression}, il y a eu {_prettify_number(nb_occurrences_this_day)} passages de cyclistes.'
 
 
 def _event_to_fact(event: Event) -> str:
