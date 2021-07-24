@@ -8,7 +8,7 @@ Example usage for the counter in rue de Rivoli in Paris: https://twitter.com/Riv
 
 ### Example
 
-```
+```sh
 git clone git@github.com:remidbs/rivoli-bot.git
 cd rivoli-bot
 python3 rivoli/tweet.py -i rivoli/tests/test_data/rivoli_test_data.csv -d random -o STD
