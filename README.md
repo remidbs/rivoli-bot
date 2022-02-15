@@ -82,7 +82,7 @@ arguments
   </tr>
   <tr>
     <td>Rue de Sebastopol, Paris</td>
-    <td>https://twitter.com/SebastopolBot</td>
+    <td>https://twitter.com/SebastoBot</td>
   </tr>
 </table>
 
